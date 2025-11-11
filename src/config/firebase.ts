@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAnalytics } from 'firebase/analytics'
-import { getAuth } from 'firebase/auth'
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 // Your web app's Firebase configuration
@@ -20,6 +20,11 @@ export const firebaseApp = initializeApp(firebaseConfig)
 // Initialize Firebase services
 export const auth = getAuth(firebaseApp)
 export const db = getFirestore(firebaseApp)
+
+// Configurar persistencia de sesión
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Error configurando persistencia:', error)
+})
 
 // Initialize Analytics (solo en producción y en el navegador)
 export const analytics = typeof window !== 'undefined' ? getAnalytics(firebaseApp) : null
