@@ -1,0 +1,1143 @@
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
+import { useRoles } from '@/composables/useRoles'
+import { useGames } from '@/composables/useGames'
+import type { GameSummary, GameEmailAccount, GamePlatform, AccountOwner } from '@/types/game'
+
+const router = useRouter()
+const { signOut } = useAuth()
+const { currentUserData, isAdmin, hasEmployeeAccess } = useRoles()
+const {
+  games,
+  isLoadingGames,
+  cargarJuegos,
+  cargarCorreosJuego,
+  crearCorreoJuego,
+  actualizarCorreoJuego,
+  eliminarCorreoJuego,
+  eliminarJuegoCompleto,
+  actualizarFotoJuego,
+  buscarJuegos,
+  generarIdJuego
+} = useGames()
+
+// Estado general
+const plataformaSeleccionada = ref<GamePlatform>('PS4 & PS5')
+const searchTerm = ref('')
+const vistaActual = ref<'juegos' | 'correos'>('juegos')
+const juegoSeleccionado = ref<GameSummary | null>(null)
+const correosJuego = ref<GameEmailAccount[]>([])
+const isLoadingCorreos = ref(false)
+
+// Estados para crear correo
+const showCreateEmail = ref(false)
+const newEmail = ref({
+  correo: '',
+  nombre: '',
+  costo: 0,
+  version: 'PS4 & PS5' as GamePlatform,
+  codigoMaster: '',
+  codigosGenerados: [] as string[],
+  fecha: new Date(),
+  codigo: '',
+  cuentas: [] as AccountOwner[]
+})
+const newCodigosTexto = ref('')
+const newCuentasTexto = ref('')
+const isCreating = ref(false)
+const createError = ref('')
+const createSuccess = ref('')
+
+// Estados para editar correo
+const showEditEmail = ref(false)
+const editingEmail = ref<GameEmailAccount | null>(null)
+const editEmailData = ref({
+  nombre: '',
+  costo: 0,
+  version: 'PS4 & PS5' as GamePlatform,
+  codigoMaster: '',
+  codigosGenerados: [] as string[],
+  fecha: new Date(),
+  codigo: '',
+  cuentas: [] as AccountOwner[]
+})
+const editCodigosTexto = ref('')
+const editCuentasTexto = ref('')
+const isEditing = ref(false)
+const editError = ref('')
+const editSuccess = ref('')
+
+// Estados para eliminar
+const showDeleteConfirm = ref(false)
+const deletingItem = ref<{ tipo: 'juego' | 'correo', data: any} | null>(null)
+const isDeleting = ref(false)
+const deleteError = ref('')
+const deleteSuccess = ref('')
+
+// Estados para ver detalles de un correo
+const showEmailDetails = ref(false)
+const selectedEmailDetails = ref<GameEmailAccount | null>(null)
+
+// Estados para editar foto del juego
+const showEditPhoto = ref(false)
+const editingGamePhoto = ref<GameSummary | null>(null)
+const newPhotoUrl = ref('')
+const isUpdatingPhoto = ref(false)
+const photoError = ref('')
+const photoSuccess = ref('')
+
+const juegosFiltrados = computed(() => {
+  if (!searchTerm.value) return games.value
+  return buscarJuegos(searchTerm.value)
+})
+
+const cargarJuegosPorPlataforma = async (): Promise<void> => {
+  vistaActual.value = 'juegos'
+  juegoSeleccionado.value = null
+  try {
+    await cargarJuegos(plataformaSeleccionada.value)
+  } catch (error) {
+    console.error('Error cargando juegos:', error)
+  }
+}
+
+const verCorreosJuego = async (juego: GameSummary): Promise<void> => {
+  juegoSeleccionado.value = juego
+  isLoadingCorreos.value = true
+  vistaActual.value = 'correos'
+
+  try {
+    correosJuego.value = await cargarCorreosJuego(plataformaSeleccionada.value, juego.id)
+  } catch (error) {
+    console.error('Error cargando correos:', error)
+  } finally {
+    isLoadingCorreos.value = false
+  }
+}
+
+const volverAJuegos = (): void => {
+  vistaActual.value = 'juegos'
+  juegoSeleccionado.value = null
+  correosJuego.value = []
+}
+
+const formatearFecha = (fecha: Date | string): string => {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha
+  return new Intl.DateTimeFormat('es-ES', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }).format(date)
+}
+
+const formatearPrecio = (precio: number): string => {
+  return new Intl.NumberFormat('es-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(precio)
+}
+
+const procesarCodigos = (texto: string): string[] => {
+  return texto
+    .split('\n')
+    .map(codigo => codigo.trim())
+    .filter(codigo => codigo.length > 0)
+}
+
+const procesarCuentas = (texto: string): AccountOwner[] => {
+  // Formato esperado: tipo|nombre|telefono (uno por línea)
+  // Ejemplo: Principal PS4|19998 Ps4|+593 99 358 6097
+  return texto
+    .split('\n')
+    .map(linea => linea.trim())
+    .filter(linea => linea.length > 0)
+    .map(linea => {
+      const partes = linea.split('|')
+      if (partes.length >= 3) {
+        return {
+          tipo: partes[0]?.trim() as any,
+          nombre: partes[1]?.trim(),
+          telefono: partes[2]?.trim()
+        }
+      }
+      return null
+    })
+    .filter(cuenta => cuenta !== null) as AccountOwner[]
+}
+
+const cuentasATexto = (cuentas: AccountOwner[]): string => {
+  return cuentas.map(c => `${c.tipo}|${c.nombre}|${c.telefono}`).join('\n')
+}
+
+const iniciarCreacion = (): void => {
+  if (!juegoSeleccionado.value) return
+  
+  newEmail.value = {
+    correo: '',
+    nombre: juegoSeleccionado.value.nombre,
+    costo: juegoSeleccionado.value.costo,
+    version: plataformaSeleccionada.value,
+    codigoMaster: '',
+    codigosGenerados: [],
+    fecha: new Date(),
+    codigo: juegoSeleccionado.value.id,
+    cuentas: []
+  }
+  newCodigosTexto.value = ''
+  newCuentasTexto.value = ''
+  createError.value = ''
+  createSuccess.value = ''
+  showCreateEmail.value = true
+}
+
+const handleCreateEmail = async (): Promise<void> => {
+  if (!juegoSeleccionado.value || !newEmail.value.correo || !newEmail.value.codigoMaster) {
+    createError.value = 'Por favor completa los campos obligatorios (correo y código master)'
+    return
+  }
+
+  isCreating.value = true
+  createError.value = ''
+  createSuccess.value = ''
+
+  try {
+    const codigos = procesarCodigos(newCodigosTexto.value)
+    const cuentas = procesarCuentas(newCuentasTexto.value)
+
+    const emailData = {
+      ...newEmail.value,
+      codigosGenerados: codigos,
+      cuentas,
+      createdBy: currentUserData.value?.uid
+    }
+
+    await crearCorreoJuego(
+      plataformaSeleccionada.value,
+      juegoSeleccionado.value.id,
+      newEmail.value.correo,
+      emailData
+    )
+
+    createSuccess.value = 'Correo agregado exitosamente'
+    await verCorreosJuego(juegoSeleccionado.value)
+
+    setTimeout(() => {
+      showCreateEmail.value = false
+      createSuccess.value = ''
+    }, 1500)
+  } catch (error) {
+    console.error('Error creando correo:', error)
+    createError.value = 'Error al crear el correo'
+  } finally {
+    isCreating.value = false
+  }
+}
+
+const iniciarEdicion = (email: GameEmailAccount): void => {
+  editingEmail.value = email
+  editEmailData.value = {
+    nombre: email.nombre,
+    costo: email.costo,
+    version: email.version,
+    codigoMaster: email.codigoMaster,
+    codigosGenerados: [...email.codigosGenerados],
+    fecha: email.fecha,
+    codigo: email.codigo,
+    cuentas: [...email.cuentas]
+  }
+  editCodigosTexto.value = email.codigosGenerados.join('\n')
+  editCuentasTexto.value = cuentasATexto(email.cuentas)
+  editError.value = ''
+  editSuccess.value = ''
+  showEditEmail.value = true
+}
+
+const handleEditEmail = async (): Promise<void> => {
+  if (!editingEmail.value || !juegoSeleccionado.value) return
+
+  isEditing.value = true
+  editError.value = ''
+  editSuccess.value = ''
+
+  try {
+    const codigos = procesarCodigos(editCodigosTexto.value)
+    const cuentas = procesarCuentas(editCuentasTexto.value)
+
+    await actualizarCorreoJuego(
+      plataformaSeleccionada.value,
+      juegoSeleccionado.value.id,
+      editingEmail.value.correo,
+      {
+        nombre: editEmailData.value.nombre,
+        costo: editEmailData.value.costo,
+        codigoMaster: editEmailData.value.codigoMaster,
+        codigosGenerados: codigos,
+        codigo: editEmailData.value.codigo,
+        cuentas
+      }
+    )
+
+    editSuccess.value = 'Correo actualizado exitosamente'
+    await verCorreosJuego(juegoSeleccionado.value)
+
+    setTimeout(() => {
+      showEditEmail.value = false
+      editSuccess.value = ''
+      editingEmail.value = null
+    }, 1500)
+  } catch (error) {
+    console.error('Error actualizando correo:', error)
+    editError.value = 'Error al actualizar el correo'
+  } finally {
+    isEditing.value = false
+  }
+}
+
+const iniciarEliminacionCorreo = (email: GameEmailAccount): void => {
+  deletingItem.value = { tipo: 'correo', data: email }
+  deleteError.value = ''
+  showDeleteConfirm.value = true
+}
+
+const iniciarEliminacionJuego = (juego: GameSummary): void => {
+  deletingItem.value = { tipo: 'juego', data: juego }
+  deleteError.value = ''
+  showDeleteConfirm.value = true
+}
+
+const handleDelete = async (): Promise<void> => {
+  if (!deletingItem.value) return
+
+  isDeleting.value = true
+  deleteError.value = ''
+  deleteSuccess.value = ''
+
+  try {
+    if (deletingItem.value.tipo === 'correo' && juegoSeleccionado.value) {
+      await eliminarCorreoJuego(
+        plataformaSeleccionada.value,
+        juegoSeleccionado.value.id,
+        deletingItem.value.data.correo
+      )
+      deleteSuccess.value = 'Correo eliminado exitosamente'
+      await verCorreosJuego(juegoSeleccionado.value)
+    } else if (deletingItem.value.tipo === 'juego') {
+      await eliminarJuegoCompleto(
+        plataformaSeleccionada.value,
+        deletingItem.value.data.id
+      )
+      deleteSuccess.value = 'Juego eliminado exitosamente'
+      await cargarJuegosPorPlataforma()
+    }
+
+    showDeleteConfirm.value = false
+    deletingItem.value = null
+
+    setTimeout(() => {
+      deleteSuccess.value = ''
+    }, 3000)
+  } catch (error) {
+    console.error('Error eliminando:', error)
+    deleteError.value = 'Error al eliminar'
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+const cancelarEliminacion = (): void => {
+  showDeleteConfirm.value = false
+  deletingItem.value = null
+  deleteError.value = ''
+}
+
+const verDetallesCorreo = (email: GameEmailAccount): void => {
+  selectedEmailDetails.value = email
+  showEmailDetails.value = true
+}
+
+const cerrarDetalles = (): void => {
+  showEmailDetails.value = false
+  selectedEmailDetails.value = null
+}
+
+const iniciarEdicionFoto = (juego: GameSummary): void => {
+  editingGamePhoto.value = juego
+  newPhotoUrl.value = juego.foto || ''
+  photoError.value = ''
+  photoSuccess.value = ''
+  showEditPhoto.value = true
+}
+
+const handleUpdatePhoto = async (): Promise<void> => {
+  if (!editingGamePhoto.value) return
+
+  if (!newPhotoUrl.value.trim()) {
+    photoError.value = 'Por favor ingresa una URL válida'
+    return
+  }
+
+  isUpdatingPhoto.value = true
+  photoError.value = ''
+  photoSuccess.value = ''
+
+  try {
+    await actualizarFotoJuego(
+      plataformaSeleccionada.value,
+      editingGamePhoto.value.id,
+      newPhotoUrl.value.trim()
+    )
+
+    photoSuccess.value = 'Foto actualizada exitosamente'
+    
+    // Actualizar en la lista local
+    const juegoIndex = games.value.findIndex(j => j.id === editingGamePhoto.value?.id)
+    if (juegoIndex !== -1) {
+      games.value[juegoIndex]!.foto = newPhotoUrl.value.trim()
+    }
+
+    setTimeout(() => {
+      showEditPhoto.value = false
+      photoSuccess.value = ''
+      editingGamePhoto.value = null
+    }, 1500)
+  } catch (error) {
+    console.error('Error actualizando foto:', error)
+    photoError.value = 'Error al actualizar la foto'
+  } finally {
+    isUpdatingPhoto.value = false
+  }
+}
+
+const cerrarEditarFoto = (): void => {
+  showEditPhoto.value = false
+  editingGamePhoto.value = null
+  newPhotoUrl.value = ''
+  photoError.value = ''
+}
+
+const handleLogout = async (): Promise<void> => {
+  await signOut()
+  router.push('/login')
+}
+
+const volverAlPanel = (): void => {
+  if (isAdmin.value) {
+    router.push('/admin')
+  } else {
+    router.push('/employee')
+  }
+}
+
+onMounted(() => {
+  cargarJuegosPorPlataforma()
+})
+</script>
+
+<template>
+  <div class="min-h-screen bg-base-200">
+    <!-- Navbar -->
+    <div class="navbar bg-base-100 shadow-lg">
+      <div class="flex-1">
+        <button class="btn btn-ghost text-xl" @click="volverAlPanel">
+          ← Gestión de Juegos
+        </button>
+      </div>
+      <div class="flex-none gap-2">
+        <div class="dropdown dropdown-end">
+          <div tabindex="0" role="button" class="btn btn-ghost">
+            {{ currentUserData?.email }}
+          </div>
+          <ul
+            tabindex="0"
+            class="mt-3 z-1 p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52"
+          >
+            <li><a @click="handleLogout">Cerrar Sesión</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="container mx-auto p-6">
+      <!-- Breadcrumb -->
+      <div class="text-sm breadcrumbs mb-4">
+        <ul>
+          <li><a @click="volverAJuegos">{{ plataformaSeleccionada }}</a></li>
+          <li v-if="vistaActual === 'correos'">{{ juegoSeleccionado?.nombre }}</li>
+        </ul>
+      </div>
+
+      <!-- Controles superiores -->
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div class="flex items-center gap-4">
+          <select 
+            v-model="plataformaSeleccionada" 
+            class="select select-bordered"
+            @change="cargarJuegosPorPlataforma"
+            :disabled="vistaActual === 'correos'"
+          >
+            <option value="PS4 & PS5">PS4 & PS5</option>
+            <option value="PS4">PS4</option>
+            <option value="PS5">PS5</option>
+            <option value="Xbox">Xbox</option>
+            <option value="Nintendo Switch">Nintendo Switch</option>
+          </select>
+
+          <input
+            v-if="vistaActual === 'juegos'"
+            v-model="searchTerm"
+            type="text"
+            placeholder="Buscar juego..."
+            class="input input-bordered w-full max-w-xs"
+          />
+        </div>
+
+        <button 
+          v-if="isAdmin && vistaActual === 'correos'" 
+          class="btn btn-primary"
+          @click="iniciarCreacion"
+        >
+          + Agregar Correo
+        </button>
+      </div>
+
+      <!-- Mensajes -->
+      <div v-if="createSuccess || editSuccess || deleteSuccess || photoSuccess" class="alert alert-success mb-4">
+        <span>{{ createSuccess || editSuccess || deleteSuccess || photoSuccess }}</span>
+      </div>
+
+      <div v-if="deleteError || photoError" class="alert alert-error mb-4">
+        <span>{{ deleteError || photoError }}</span>
+      </div>
+
+      <!-- Vista de Juegos -->
+      <div v-if="vistaActual === 'juegos'" class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <h2 class="card-title">
+            Juegos de {{ plataformaSeleccionada }}
+            <span class="badge badge-lg">{{ juegosFiltrados.length }}</span>
+          </h2>
+
+          <div v-if="isLoadingGames" class="flex justify-center p-8">
+            <span class="loading loading-spinner loading-lg"></span>
+          </div>
+
+          <div v-else-if="juegosFiltrados.length === 0" class="text-center p-8">
+            <p class="text-gray-500">No hay juegos registrados</p>
+          </div>
+
+          <div v-else class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>Nombre del Juego</th>
+                  <th>Precio</th>
+                  <th>Total Correos</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="juego in juegosFiltrados" :key="juego.id">
+                  <td>
+                    <div class="avatar">
+                      <div class="w-16 rounded">
+                        <img 
+                          v-if="juego.foto" 
+                          :src="juego.foto" 
+                          :alt="juego.nombre"
+                          class="object-cover"
+                        />
+                        <div v-else class="bg-base-300 w-full h-full flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="font-bold">{{ juego.nombre }}</div>
+                    <div class="text-sm opacity-50">ID: {{ juego.id }}</div>
+                  </td>
+                  <td>
+                    <span class="badge badge-success">{{ formatearPrecio(juego.costo) }}</span>
+                  </td>
+                  <td>
+                    <span class="badge badge-info">{{ juego.totalCorreos }}</span>
+                  </td>
+                  <td>
+                    <div class="flex gap-2">
+                      <button
+                        class="btn btn-sm btn-info"
+                        @click="verCorreosJuego(juego)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Ver Correos
+                      </button>
+                      <button
+                        v-if="isAdmin"
+                        class="btn btn-sm btn-warning"
+                        @click="iniciarEdicionFoto(juego)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      <button
+                        v-if="isAdmin"
+                        class="btn btn-sm btn-error"
+                        @click="iniciarEliminacionJuego(juego)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista de Correos -->
+      <div v-if="vistaActual === 'correos'" class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <div class="flex justify-between items-center">
+            <h2 class="card-title">
+              Correos de {{ juegoSeleccionado?.nombre }}
+              <span class="badge badge-lg">{{ correosJuego.length }}</span>
+            </h2>
+            <button class="btn btn-sm btn-ghost" @click="volverAJuegos">
+              ← Volver a juegos
+            </button>
+          </div>
+
+          <div v-if="isLoadingCorreos" class="flex justify-center p-8">
+            <span class="loading loading-spinner loading-lg"></span>
+          </div>
+
+          <div v-else-if="correosJuego.length === 0" class="text-center p-8">
+            <p class="text-gray-500">No hay correos registrados para este juego</p>
+          </div>
+
+          <div v-else class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Correo</th>
+                  <th>Códigos</th>
+                  <th>Cuentas</th>
+                  <th>Fecha</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="email in correosJuego" :key="email.correo">
+                  <td>
+                    <div class="font-mono text-sm">{{ email.correo }}</div>
+                    <div class="text-xs opacity-50">Código: {{ email.codigo }}</div>
+                  </td>
+                  <td>
+                    <span class="badge badge-info">{{ email.codigosGenerados.length + 1 }}</span>
+                  </td>
+                  <td>
+                    <span class="badge badge-success">{{ email.cuentas.length }}</span>
+                  </td>
+                  <td>{{ formatearFecha(email.fecha) }}</td>
+                  <td>
+                    <div class="flex gap-2">
+                      <button
+                        class="btn btn-sm btn-info"
+                        @click="verDetallesCorreo(email)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      <button
+                        v-if="isAdmin"
+                        class="btn btn-sm btn-primary"
+                        @click="iniciarEdicion(email)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        v-if="isAdmin"
+                        class="btn btn-sm btn-error"
+                        @click="iniciarEliminacionCorreo(email)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal para agregar correo -->
+    <dialog :class="['modal', { 'modal-open': showCreateEmail }]">
+      <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg mb-4">Agregar Correo a {{ juegoSeleccionado?.nombre }}</h3>
+
+        <form @submit.prevent="handleCreateEmail" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="form-control md:col-span-2">
+              <label class="label">
+                <span class="label-text">Correo *</span>
+              </label>
+              <input
+                v-model="newEmail.correo"
+                type="email"
+                placeholder="theg.am.e.rsz.o.nec@gmail.com"
+                class="input input-bordered"
+                required
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Precio</span>
+              </label>
+              <input
+                v-model.number="newEmail.costo"
+                type="number"
+                step="0.01"
+                class="input input-bordered"
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Código</span>
+              </label>
+              <input
+                v-model="newEmail.codigo"
+                type="text"
+                placeholder="90006"
+                class="input input-bordered"
+              />
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Código Master *</span>
+            </label>
+            <textarea
+              v-model="newEmail.codigoMaster"
+              class="textarea textarea-bordered h-24"
+              placeholder="BSR6BUDLUZJUVUORBS4CIF45..."
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Códigos Generados (uno por línea)</span>
+            </label>
+            <textarea
+              v-model="newCodigosTexto"
+              class="textarea textarea-bordered h-32"
+              placeholder="wGQHtn&#10;MyEj7B&#10;RMe3kn"
+            ></textarea>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Cuentas (formato: tipo|nombre|teléfono)</span>
+            </label>
+            <textarea
+              v-model="newCuentasTexto"
+              class="textarea textarea-bordered h-32"
+              placeholder="Principal PS4|19998 Ps4|+593 99 358 6097&#10;Secundaria PS4|Frank Fc PS4|+593 98 777 1379"
+            ></textarea>
+            <label class="label">
+              <span class="label-text-alt">Formato: tipo|nombre|teléfono (uno por línea)</span>
+            </label>
+          </div>
+
+          <div v-if="createError" class="alert alert-error">
+            <span>{{ createError }}</span>
+          </div>
+
+          <div v-if="createSuccess" class="alert alert-success">
+            <span>{{ createSuccess }}</span>
+          </div>
+
+          <div class="modal-action">
+            <button
+              type="button"
+              class="btn"
+              @click="showCreateEmail = false"
+              :disabled="isCreating"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              :disabled="isCreating"
+            >
+              <span v-if="isCreating" class="loading loading-spinner"></span>
+              {{ isCreating ? 'Creando...' : 'Agregar Correo' }}
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="showCreateEmail = false">close</button>
+      </form>
+    </dialog>
+
+    <!-- Modal para editar correo -->
+    <dialog :class="['modal', { 'modal-open': showEditEmail }]">
+      <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg mb-4">Editar Correo</h3>
+
+        <form @submit.prevent="handleEditEmail" class="space-y-4">
+          <div class="alert alert-info">
+            <span>Editando: {{ editingEmail?.correo }}</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Precio</span>
+              </label>
+              <input
+                v-model.number="editEmailData.costo"
+                type="number"
+                step="0.01"
+                class="input input-bordered"
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">Código</span>
+              </label>
+              <input
+                v-model="editEmailData.codigo"
+                type="text"
+                class="input input-bordered"
+              />
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Código Master</span>
+            </label>
+            <textarea
+              v-model="editEmailData.codigoMaster"
+              class="textarea textarea-bordered h-24"
+              required
+            ></textarea>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Códigos Generados (uno por línea)</span>
+            </label>
+            <textarea
+              v-model="editCodigosTexto"
+              class="textarea textarea-bordered h-32"
+            ></textarea>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Cuentas (formato: tipo|nombre|teléfono)</span>
+            </label>
+            <textarea
+              v-model="editCuentasTexto"
+              class="textarea textarea-bordered h-32"
+            ></textarea>
+            <label class="label">
+              <span class="label-text-alt">Formato: tipo|nombre|teléfono (uno por línea)</span>
+            </label>
+          </div>
+
+          <div v-if="editError" class="alert alert-error">
+            <span>{{ editError }}</span>
+          </div>
+
+          <div v-if="editSuccess" class="alert alert-success">
+            <span>{{ editSuccess }}</span>
+          </div>
+
+          <div class="modal-action">
+            <button
+              type="button"
+              class="btn"
+              @click="showEditEmail = false"
+              :disabled="isEditing"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              :disabled="isEditing"
+            >
+              <span v-if="isEditing" class="loading loading-spinner"></span>
+              {{ isEditing ? 'Guardando...' : 'Guardar Cambios' }}
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="showEditEmail = false">close</button>
+      </form>
+    </dialog>
+
+    <!-- Modal de confirmación de eliminación -->
+    <dialog :class="['modal', { 'modal-open': showDeleteConfirm }]">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Confirmar Eliminación</h3>
+
+        <div class="py-4">
+          <p class="text-base mb-4">
+            ¿Estás seguro de que deseas eliminar este {{ deletingItem?.tipo === 'juego' ? 'juego completo' : 'correo' }}?
+          </p>
+
+          <div v-if="deletingItem" class="bg-base-200 p-4 rounded-lg">
+            <p v-if="deletingItem.tipo === 'juego'" class="font-semibold">
+              {{ deletingItem.data.nombre }}
+            </p>
+            <p v-else class="font-mono text-sm">
+              {{ deletingItem.data.correo }}
+            </p>
+          </div>
+
+          <div class="alert alert-warning mt-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>Esta acción no se puede deshacer</span>
+          </div>
+
+          <div v-if="deleteError" class="alert alert-error mt-4">
+            <span>{{ deleteError }}</span>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button
+            type="button"
+            class="btn"
+            @click="cancelarEliminacion"
+            :disabled="isDeleting"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-error"
+            @click="handleDelete"
+            :disabled="isDeleting"
+          >
+            <span v-if="isDeleting" class="loading loading-spinner"></span>
+            {{ isDeleting ? 'Eliminando...' : 'Eliminar' }}
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="cancelarEliminacion">close</button>
+      </form>
+    </dialog>
+
+    <!-- Modal para editar foto del juego -->
+    <dialog :class="['modal', { 'modal-open': showEditPhoto }]">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Editar Foto del Juego</h3>
+
+        <form @submit.prevent="handleUpdatePhoto" class="space-y-4">
+          <div v-if="editingGamePhoto" class="alert alert-info">
+            <span>Editando foto de: {{ editingGamePhoto.nombre }}</span>
+          </div>
+
+          <!-- Preview de la foto actual -->
+          <div v-if="editingGamePhoto?.foto" class="form-control">
+            <label class="label">
+              <span class="label-text">Foto Actual</span>
+            </label>
+            <div class="avatar">
+              <div class="w-32 rounded">
+                <img :src="editingGamePhoto.foto" :alt="editingGamePhoto.nombre" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">URL de la Foto *</span>
+            </label>
+            <input
+              v-model="newPhotoUrl"
+              type="url"
+              placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
+              class="input input-bordered"
+              required
+            />
+            <label class="label">
+              <span class="label-text-alt">Ingresa la URL completa de la imagen</span>
+            </label>
+          </div>
+
+          <!-- Preview de la nueva foto -->
+          <div v-if="newPhotoUrl" class="form-control">
+            <label class="label">
+              <span class="label-text">Vista Previa</span>
+            </label>
+            <div class="avatar">
+              <div class="w-32 rounded">
+                <img 
+                  :src="newPhotoUrl" 
+                  alt="Preview"
+                  @error="(e) => (e.target as HTMLImageElement).src = ''"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div v-if="photoError" class="alert alert-error">
+            <span>{{ photoError }}</span>
+          </div>
+
+          <div v-if="photoSuccess" class="alert alert-success">
+            <span>{{ photoSuccess }}</span>
+          </div>
+
+          <div class="modal-action">
+            <button
+              type="button"
+              class="btn"
+              @click="cerrarEditarFoto"
+              :disabled="isUpdatingPhoto"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              :disabled="isUpdatingPhoto"
+            >
+              <span v-if="isUpdatingPhoto" class="loading loading-spinner"></span>
+              {{ isUpdatingPhoto ? 'Guardando...' : 'Guardar Foto' }}
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="cerrarEditarFoto">close</button>
+      </form>
+    </dialog>
+
+    <!-- Modal para ver detalles del correo -->
+    <dialog :class="['modal', { 'modal-open': showEmailDetails }]">
+      <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg mb-4">Detalles del Correo</h3>
+
+        <div v-if="selectedEmailDetails" class="space-y-4">
+          <!-- Información General -->
+          <div class="card bg-base-200">
+            <div class="card-body">
+              <h4 class="card-title text-sm">Información General</h4>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <span class="font-semibold">Correo:</span>
+                  <p class="font-mono text-sm">{{ selectedEmailDetails.correo }}</p>
+                </div>
+                <div>
+                  <span class="font-semibold">Nombre del Juego:</span>
+                  <p>{{ selectedEmailDetails.nombre }}</p>
+                </div>
+                <div>
+                  <span class="font-semibold">Precio:</span>
+                  <p>{{ formatearPrecio(selectedEmailDetails.costo) }}</p>
+                </div>
+                <div>
+                  <span class="font-semibold">Código:</span>
+                  <p>{{ selectedEmailDetails.codigo }}</p>
+                </div>
+                <div>
+                  <span class="font-semibold">Fecha:</span>
+                  <p>{{ formatearFecha(selectedEmailDetails.fecha) }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Código Master -->
+          <div class="card bg-base-200">
+            <div class="card-body">
+              <h4 class="card-title text-sm">Código Master</h4>
+              <div class="bg-base-300 p-3 rounded font-mono text-xs break-all">
+                {{ selectedEmailDetails.codigoMaster }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Códigos Generados -->
+          <div class="card bg-base-200">
+            <div class="card-body">
+              <h4 class="card-title text-sm">Códigos Generados ({{ selectedEmailDetails.codigosGenerados.length }})</h4>
+              <div class="grid grid-cols-3 gap-2">
+                <div v-for="(codigo, index) in selectedEmailDetails.codigosGenerados" :key="index" class="bg-base-300 p-2 rounded font-mono text-xs text-center">
+                  {{ codigo }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cuentas -->
+          <div class="card bg-base-200">
+            <div class="card-body">
+              <h4 class="card-title text-sm">Cuentas ({{ selectedEmailDetails.cuentas.length }})</h4>
+              <div class="space-y-2">
+                <div v-for="(cuenta, index) in selectedEmailDetails.cuentas" :key="index" class="flex items-center justify-between bg-base-300 p-3 rounded">
+                  <div>
+                    <span class="badge badge-sm mr-2" :class="{
+                      'badge-primary': cuenta.tipo.includes('Principal'),
+                      'badge-secondary': cuenta.tipo.includes('Secundaria')
+                    }">
+                      {{ cuenta.tipo }}
+                    </span>
+                    <span class="font-medium">{{ cuenta.nombre }}</span>
+                  </div>
+                  <span class="text-sm">{{ cuenta.telefono }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn" @click="cerrarDetalles">
+            Cerrar
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="cerrarDetalles">close</button>
+      </form>
+    </dialog>
+  </div>
+</template>

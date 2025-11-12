@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { useCurrentUser } from 'vuefire'
 import type { AppUser, UserRole } from '@/types/user'
@@ -66,6 +66,49 @@ export function useRoles() {
     await setDoc(doc(db, 'users', uid), userData)
   }
 
+  const updateUserRole = async (uid: string, newRole: UserRole): Promise<void> => {
+    try {
+      const userRef = doc(db, 'users', uid)
+      await setDoc(userRef, { role: newRole }, { merge: true })
+    } catch (error) {
+      console.error('Error actualizando rol del usuario:', error)
+      throw error
+    }
+  }
+
+  const updateUserData = async (
+    uid: string,
+    displayName?: string,
+    email?: string
+  ): Promise<void> => {
+    try {
+      const userRef = doc(db, 'users', uid)
+      const updateData: Partial<AppUser> = {}
+      
+      if (displayName !== undefined) {
+        updateData.displayName = displayName
+      }
+      if (email !== undefined) {
+        updateData.email = email
+      }
+      
+      await setDoc(userRef, updateData, { merge: true })
+    } catch (error) {
+      console.error('Error actualizando datos del usuario:', error)
+      throw error
+    }
+  }
+
+  const deleteUser = async (uid: string): Promise<void> => {
+    try {
+      const userRef = doc(db, 'users', uid)
+      await deleteDoc(userRef)
+    } catch (error) {
+      console.error('Error eliminando usuario:', error)
+      throw error
+    }
+  }
+
   const isAdmin = computed(() => currentUserData.value?.role === 'admin')
   const isEmployee = computed(() => currentUserData.value?.role === 'employee')
   const isClient = computed(() => currentUserData.value?.role === 'client')
@@ -77,6 +120,9 @@ export function useRoles() {
     isLoadingUserData,
     loadUserData,
     createUserWithRole,
+    updateUserRole,
+    updateUserData,
+    deleteUser,
     isAdmin,
     isEmployee,
     isClient,
