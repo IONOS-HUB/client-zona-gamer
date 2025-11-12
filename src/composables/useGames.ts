@@ -30,6 +30,7 @@ export function useGames() {
       // Iterar sobre cada documento de juego (ej: a_way_out)
       for (const juegoDoc of querySnapshot.docs) {
         const juegoId = juegoDoc.id
+        const juegoDocData = juegoDoc.data()
         
         // Obtener todos los correos dentro de este juego
         const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
@@ -53,6 +54,7 @@ export function useGames() {
             nombre: juegoData.nombre || juegoId,
             costo: juegoData.costo || 0,
             version: juegoData.version || plataforma,
+            foto: juegoDocData.foto || '', // Foto del documento principal
             totalCorreos: correos.length,
             correos
           })
@@ -225,6 +227,20 @@ export function useGames() {
     }
   }
 
+  const actualizarFotoJuego = async (
+    plataforma: GamePlatform,
+    juegoId: string,
+    fotoUrl: string
+  ): Promise<void> => {
+    try {
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
+      await setDoc(juegoRef, { foto: fotoUrl }, { merge: true })
+    } catch (error) {
+      console.error('Error actualizando foto:', error)
+      throw error
+    }
+  }
+
   const generarIdJuego = (nombre: string): string => {
     return nombre
       .toLowerCase()
@@ -265,6 +281,7 @@ export function useGames() {
     actualizarCorreoJuego,
     eliminarCorreoJuego,
     eliminarJuegoCompleto,
+    actualizarFotoJuego,
     buscarJuegos,
     filtrarJuegosPorPrecio,
     generarIdJuego

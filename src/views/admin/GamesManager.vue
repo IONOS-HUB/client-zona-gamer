@@ -18,6 +18,7 @@ const {
   actualizarCorreoJuego,
   eliminarCorreoJuego,
   eliminarJuegoCompleto,
+  actualizarFotoJuego,
   buscarJuegos,
   generarIdJuego
 } = useGames()
@@ -78,6 +79,14 @@ const deleteSuccess = ref('')
 // Estados para ver detalles de un correo
 const showEmailDetails = ref(false)
 const selectedEmailDetails = ref<GameEmailAccount | null>(null)
+
+// Estados para editar foto del juego
+const showEditPhoto = ref(false)
+const editingGamePhoto = ref<GameSummary | null>(null)
+const newPhotoUrl = ref('')
+const isUpdatingPhoto = ref(false)
+const photoError = ref('')
+const photoSuccess = ref('')
 
 const juegosFiltrados = computed(() => {
   if (!searchTerm.value) return games.value
@@ -148,9 +157,9 @@ const procesarCuentas = (texto: string): AccountOwner[] => {
       const partes = linea.split('|')
       if (partes.length >= 3) {
         return {
-          tipo: partes[0].trim() as any,
-          nombre: partes[1].trim(),
-          telefono: partes[2].trim()
+          tipo: partes[0]?.trim() as any,
+          nombre: partes[1]?.trim(),
+          telefono: partes[2]?.trim()
         }
       }
       return null
@@ -353,6 +362,61 @@ const cerrarDetalles = (): void => {
   selectedEmailDetails.value = null
 }
 
+const iniciarEdicionFoto = (juego: GameSummary): void => {
+  editingGamePhoto.value = juego
+  newPhotoUrl.value = juego.foto || ''
+  photoError.value = ''
+  photoSuccess.value = ''
+  showEditPhoto.value = true
+}
+
+const handleUpdatePhoto = async (): Promise<void> => {
+  if (!editingGamePhoto.value) return
+
+  if (!newPhotoUrl.value.trim()) {
+    photoError.value = 'Por favor ingresa una URL válida'
+    return
+  }
+
+  isUpdatingPhoto.value = true
+  photoError.value = ''
+  photoSuccess.value = ''
+
+  try {
+    await actualizarFotoJuego(
+      plataformaSeleccionada.value,
+      editingGamePhoto.value.id,
+      newPhotoUrl.value.trim()
+    )
+
+    photoSuccess.value = 'Foto actualizada exitosamente'
+    
+    // Actualizar en la lista local
+    const juegoIndex = games.value.findIndex(j => j.id === editingGamePhoto.value?.id)
+    if (juegoIndex !== -1) {
+      games.value[juegoIndex]!.foto = newPhotoUrl.value.trim()
+    }
+
+    setTimeout(() => {
+      showEditPhoto.value = false
+      photoSuccess.value = ''
+      editingGamePhoto.value = null
+    }, 1500)
+  } catch (error) {
+    console.error('Error actualizando foto:', error)
+    photoError.value = 'Error al actualizar la foto'
+  } finally {
+    isUpdatingPhoto.value = false
+  }
+}
+
+const cerrarEditarFoto = (): void => {
+  showEditPhoto.value = false
+  editingGamePhoto.value = null
+  newPhotoUrl.value = ''
+  photoError.value = ''
+}
+
 const handleLogout = async (): Promise<void> => {
   await signOut()
   router.push('/login')
@@ -440,12 +504,12 @@ onMounted(() => {
       </div>
 
       <!-- Mensajes -->
-      <div v-if="createSuccess || editSuccess || deleteSuccess" class="alert alert-success mb-4">
-        <span>{{ createSuccess || editSuccess || deleteSuccess }}</span>
+      <div v-if="createSuccess || editSuccess || deleteSuccess || photoSuccess" class="alert alert-success mb-4">
+        <span>{{ createSuccess || editSuccess || deleteSuccess || photoSuccess }}</span>
       </div>
 
-      <div v-if="deleteError" class="alert alert-error mb-4">
-        <span>{{ deleteError }}</span>
+      <div v-if="deleteError || photoError" class="alert alert-error mb-4">
+        <span>{{ deleteError || photoError }}</span>
       </div>
 
       <!-- Vista de Juegos -->
@@ -468,6 +532,7 @@ onMounted(() => {
             <table class="table table-zebra">
               <thead>
                 <tr>
+                  <th>Foto</th>
                   <th>Nombre del Juego</th>
                   <th>Precio</th>
                   <th>Total Correos</th>
@@ -476,6 +541,23 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr v-for="juego in juegosFiltrados" :key="juego.id">
+                  <td>
+                    <div class="avatar">
+                      <div class="w-16 rounded">
+                        <img 
+                          v-if="juego.foto" 
+                          :src="juego.foto" 
+                          :alt="juego.nombre"
+                          class="object-cover"
+                        />
+                        <div v-else class="bg-base-300 w-full h-full flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
                   <td>
                     <div class="font-bold">{{ juego.nombre }}</div>
                     <div class="text-sm opacity-50">ID: {{ juego.id }}</div>
@@ -497,6 +579,15 @@ onMounted(() => {
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
                         Ver Correos
+                      </button>
+                      <button
+                        v-if="isAdmin"
+                        class="btn btn-sm btn-warning"
+                        @click="iniciarEdicionFoto(juego)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
                       </button>
                       <button
                         v-if="isAdmin"
@@ -869,6 +960,93 @@ onMounted(() => {
       </div>
       <form method="dialog" class="modal-backdrop">
         <button @click="cancelarEliminacion">close</button>
+      </form>
+    </dialog>
+
+    <!-- Modal para editar foto del juego -->
+    <dialog :class="['modal', { 'modal-open': showEditPhoto }]">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Editar Foto del Juego</h3>
+
+        <form @submit.prevent="handleUpdatePhoto" class="space-y-4">
+          <div v-if="editingGamePhoto" class="alert alert-info">
+            <span>Editando foto de: {{ editingGamePhoto.nombre }}</span>
+          </div>
+
+          <!-- Preview de la foto actual -->
+          <div v-if="editingGamePhoto?.foto" class="form-control">
+            <label class="label">
+              <span class="label-text">Foto Actual</span>
+            </label>
+            <div class="avatar">
+              <div class="w-32 rounded">
+                <img :src="editingGamePhoto.foto" :alt="editingGamePhoto.nombre" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">URL de la Foto *</span>
+            </label>
+            <input
+              v-model="newPhotoUrl"
+              type="url"
+              placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
+              class="input input-bordered"
+              required
+            />
+            <label class="label">
+              <span class="label-text-alt">Ingresa la URL completa de la imagen</span>
+            </label>
+          </div>
+
+          <!-- Preview de la nueva foto -->
+          <div v-if="newPhotoUrl" class="form-control">
+            <label class="label">
+              <span class="label-text">Vista Previa</span>
+            </label>
+            <div class="avatar">
+              <div class="w-32 rounded">
+                <img 
+                  :src="newPhotoUrl" 
+                  alt="Preview"
+                  @error="(e) => (e.target as HTMLImageElement).src = ''"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div v-if="photoError" class="alert alert-error">
+            <span>{{ photoError }}</span>
+          </div>
+
+          <div v-if="photoSuccess" class="alert alert-success">
+            <span>{{ photoSuccess }}</span>
+          </div>
+
+          <div class="modal-action">
+            <button
+              type="button"
+              class="btn"
+              @click="cerrarEditarFoto"
+              :disabled="isUpdatingPhoto"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              :disabled="isUpdatingPhoto"
+            >
+              <span v-if="isUpdatingPhoto" class="loading loading-spinner"></span>
+              {{ isUpdatingPhoto ? 'Guardando...' : 'Guardar Foto' }}
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="cerrarEditarFoto">close</button>
       </form>
     </dialog>
 

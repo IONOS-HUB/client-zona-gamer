@@ -30,6 +30,7 @@ export interface GameSummary {
   nombre: string
   costo: number
   version: GamePlatform
+  foto?: string // URL de la imagen del juego
   totalCorreos: number
   correos: string[] // Lista de correos asociados
 }
