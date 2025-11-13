@@ -75,3 +75,11 @@ Este proyecto usa Firebase para autenticación y base de datos. Para configurar 
 - **VueFire** - Integración de Firebase con Vue
 - **Tailwind CSS** - Framework de utilidades CSS
 - **daisyUI** - Componentes UI para Tailwind
+- **Lucide Icons** - Sistema de iconos SVG moderno
+
+## Documentación Adicional
+
+- **[CAMBIOS_FRONTEND.md](./CAMBIOS_FRONTEND.md)** - Documentación completa de los cambios en el frontend
+- **[GUIA_ICONOS.md](./GUIA_ICONOS.md)** - Guía de uso de iconos Lucide
+- **[EJEMPLO_DATOS_FIREBASE.md](./EJEMPLO_DATOS_FIREBASE.md)** - Ejemplos de datos para Firebase
+- **[ESTRUCTURA_BDD.md](./ESTRUCTURA_BDD.md)** - Estructura de la base de datos

@@ -33,6 +33,11 @@ export interface GameSummary {
   foto?: string // URL de la imagen del juego
   totalCorreos: number
   correos: string[] // Lista de correos asociados
+  descuento?: number // Porcentaje de descuento (0-100)
+  precioOriginal?: number // Precio antes del descuento
+  rating?: number // Calificación (0-5)
+  totalReviews?: number // Número de reseñas
+  destacado?: boolean // Si debe aparecer en la sección de ofertas
 }
 
 export interface GameFilters {

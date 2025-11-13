@@ -88,6 +88,7 @@ const isUpdatingPhoto = ref(false)
 const photoError = ref('')
 const photoSuccess = ref('')
 
+
 const juegosFiltrados = computed(() => {
   if (!searchTerm.value) return games.value
   return buscarJuegos(searchTerm.value)
@@ -416,6 +417,7 @@ const cerrarEditarFoto = (): void => {
   newPhotoUrl.value = ''
   photoError.value = ''
 }
+
 
 const handleLogout = async (): Promise<void> => {
   await signOut()
