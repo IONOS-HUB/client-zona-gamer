@@ -241,6 +241,35 @@ export function useGames() {
     }
   }
 
+  const crearJuego = async (
+    plataforma: GamePlatform,
+    nombre: string,
+    foto?: string
+  ): Promise<string> => {
+    try {
+      const juegoId = generarIdJuego(nombre)
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
+      
+      // Verificar si el juego ya existe
+      const juegoDoc = await getDoc(juegoRef)
+      if (juegoDoc.exists()) {
+        throw new Error(`El juego "${nombre}" ya existe en esta plataforma`)
+      }
+
+      // Crear el documento del juego (puede estar vacío o tener foto)
+      const juegoData: Record<string, any> = {}
+      if (foto && foto.trim()) {
+        juegoData.foto = foto.trim()
+      }
+
+      await setDoc(juegoRef, juegoData)
+      return juegoId
+    } catch (error) {
+      console.error('Error creando juego:', error)
+      throw error
+    }
+  }
+
   const generarIdJuego = (nombre: string): string => {
     return nombre
       .toLowerCase()
@@ -282,6 +311,7 @@ export function useGames() {
     eliminarCorreoJuego,
     eliminarJuegoCompleto,
     actualizarFotoJuego,
+    crearJuego,
     buscarJuegos,
     filtrarJuegosPorPrecio,
     generarIdJuego
