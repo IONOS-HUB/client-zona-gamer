@@ -5,6 +5,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useCartStore } from '@/stores/cart'
 import { Search, ShoppingCart, User, Send, Gamepad2 } from 'lucide-vue-next'
 import type { GamePlatform } from '@/types/game'
+import logo from '../../../public/Images/logo/logo.png'
 
 const router = useRouter()
 const { currentUser, signOut } = useAuth()
@@ -123,16 +124,11 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
       <div class="container mx-auto px-4">
         <div class="flex items-center justify-between py-4 gap-6 animate-fadeInUp">
           <!-- Logo -->
-          <a 
-            @click="router.push('/')" 
-            class="flex flex-col items-start cursor-pointer hover:scale-105 transition-all duration-300 flex-shrink-0 group"
-          >
-            <div class="flex items-baseline">
-              <span class="text-2xl font-black text-gradient-animated tracking-tight">ZONA</span>
-              <span class="text-2xl font-black text-white tracking-tight ml-1 group-hover:text-error transition-colors duration-300">GAMERS</span>
-            </div>
-            <span class="text-xs text-error font-semibold tracking-wider -mt-1 group-hover:tracking-widest transition-all duration-300">ECUADOR</span>
-          </a>
+          <img 
+            :src="logo" 
+            alt="Zona Gamers" 
+            class="w-30  object-contain"
+          />
 
           <!-- Centro: Filtros de Plataformas (PS4 y PS5) y Buscador -->
           <div class="flex-1 flex items-center justify-center gap-4 animate-fadeInUp delay-100">
@@ -149,7 +145,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
                     : 'text-base-content/70 hover:text-white hover:bg-white/5 border border-transparent'
                 ]"
               >
-                <Gamepad2 :size="20" class="flex-shrink-0" />
+                <Gamepad2 :size="20" class="shrink-0" />
                 <span class="text-sm">{{ platform.label }}</span>
               </button>
             </div>
@@ -160,7 +156,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <button
                 v-if="!isSearchExpanded"
                 @click="toggleSearch"
-                class="btn btn-circle bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 hover:from-orange-600 hover:to-red-600 border-none shadow-lg text-white transition-all duration-300 hover:scale-110 w-12 h-12"
+                class="btn btn-circle bg-linear-gradient(to right, #dc2626, #991b1b) hover:from-orange-600 hover:to-red-600 border-none shadow-lg text-white transition-all duration-300 hover:scale-110 w-12 h-12"
               >
                 <Search :size="20" />
               </button>
@@ -174,7 +170,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
                   v-model="searchQuery"
                   type="text"
                   placeholder="Minecraft, RPG, multijugador..."
-                  class="input bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 border-none text-white placeholder:text-orange-100/90 pl-6 pr-12 rounded-full shadow-lg transition-all duration-300 w-80 focus:outline-none focus:ring-2 focus:ring-orange-400/50 text-base"
+                  class="input bg-linear-gradient(to right, #dc2626, #991b1b) border-none text-white placeholder:text-orange-100/90 pl-6 pr-12 rounded-full shadow-lg transition-all duration-300 w-80 focus:outline-none focus:ring-2 focus:ring-orange-400/50 text-base"
                   @keyup.enter="handleSearch"
                   @blur="handleSearchBlur"
                   autofocus
@@ -192,7 +188,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
           </div>
 
           <!-- Acciones (Usuario y Carrito) -->
-          <div class="flex items-center gap-2 flex-shrink-0 animate-fadeInUp delay-200">
+          <div class="flex items-center gap-2 shrink-0 animate-fadeInUp delay-200">
             <!-- Botón Usuario -->
             <div v-if="currentUser" class="dropdown dropdown-end">
               <div 
@@ -204,7 +200,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               </div>
               <ul
                 tabindex="0"
-                class="mt-3 z-[1] p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-52 border border-white/10 animate-scaleIn"
+                class="mt-3 z-1 p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-52 border border-white/10 animate-scaleIn"
               >
                 <li class="menu-title">
                   <span class="text-xs">{{ currentUser.email }}</span>
@@ -239,7 +235,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <!-- Dropdown del carrito -->
               <div
                 tabindex="0"
-                class="mt-3 z-[1] card card-compact dropdown-content w-80 shadow-xl border border-white/10 animate-fadeInUp bg-base-100"
+                class="mt-3 z-1 card card-compact dropdown-content w-80 shadow-xl border border-white/10 animate-fadeInUp bg-base-100"
               >
                 <div class="card-body">
                   <div class="flex items-center justify-between mb-2">
