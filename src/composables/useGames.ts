@@ -246,7 +246,12 @@ export function useGames() {
         throw new Error(`El juego "${nombre}" ya existe en esta plataforma`)
       }
       
-      const juegoData: Record<string, any> = {}
+      // Siempre crear el documento con al menos estos campos para asegurar que se cree en Firestore
+      const juegoData: Record<string, any> = {
+        createdAt: new Date(),
+        nombre: nombre
+      }
+      
       if (foto && foto.trim()) juegoData.foto = foto.trim()
       if (isOffert !== undefined) juegoData.isOffert = isOffert
       

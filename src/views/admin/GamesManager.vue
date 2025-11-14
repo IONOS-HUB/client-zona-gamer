@@ -240,6 +240,52 @@ const handleFileUpload = (event: Event): void => {
   input.value = ''
 }
 
+// Estados para drag & drop
+const isDragging = ref(false)
+let dragCounter = 0
+
+const handleDragEnter = (e: DragEvent): void => {
+  e.preventDefault()
+  dragCounter++
+  isDragging.value = true
+}
+
+const handleDragLeave = (e: DragEvent): void => {
+  e.preventDefault()
+  dragCounter--
+  if (dragCounter === 0) {
+    isDragging.value = false
+  }
+}
+
+const handleDragOver = (e: DragEvent): void => {
+  e.preventDefault()
+}
+
+const handleDrop = (e: DragEvent): void => {
+  e.preventDefault()
+  isDragging.value = false
+  dragCounter = 0
+  
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0) return
+  
+  const file = files[0]
+  if (!file) return
+  
+  if (!file.name.endsWith('.txt')) {
+    createError.value = 'Por favor arrastra un archivo .txt'
+    return
+  }
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const contenido = e.target?.result as string
+    parsearArchivoTxt(contenido)
+  }
+  reader.readAsText(file)
+}
+
 // Funciones para manejar códigos
 const agregarCodigo = (isEdit: boolean = false): void => {
   const nuevoCodigo = prompt('Ingresa el nuevo código:')
@@ -298,6 +344,8 @@ const iniciarCreacion = (): void => {
   }
   createError.value = ''
   createSuccess.value = ''
+  isDragging.value = false
+  dragCounter = 0
   showCreateEmail.value = true
 }
 
@@ -856,21 +904,41 @@ onMounted(async () => {
       <div class="modal-box max-w-4xl">
         <h3 class="font-bold text-lg mb-4">Agregar Correo a {{ juegoSeleccionado?.nombre }}</h3>
 
-        <!-- Botón para subir archivo .txt -->
-        <div class="alert alert-info mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div class="flex-1">
-            <span>¿Tienes un archivo .txt? Súbelo para llenar automáticamente los campos</span>
-          </div>
-          <label class="btn btn-sm btn-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <!-- Área de drag & drop para subir archivo .txt -->
+        <div 
+          class="border-2 border-dashed rounded-lg p-6 mb-4 transition-all"
+          :class="isDragging ? 'border-primary bg-primary bg-opacity-10' : 'border-base-300'"
+          @dragenter="handleDragEnter"
+          @dragleave="handleDragLeave"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+        >
+          <div class="flex flex-col items-center justify-center text-center">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              class="h-12 w-12 mb-3 transition-colors"
+              :class="isDragging ? 'text-primary' : 'text-base-content opacity-50'"
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            Subir .txt
-            <input type="file" accept=".txt" class="hidden" @change="handleFileUpload" />
-          </label>
+            <p class="text-base font-medium mb-2" :class="isDragging ? 'text-primary' : ''">
+              {{ isDragging ? '¡Suelta el archivo aquí!' : 'Arrastra y suelta tu archivo .txt aquí' }}
+            </p>
+            <p class="text-sm text-base-content opacity-60 mb-4">o</p>
+            <label class="btn btn-sm btn-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Seleccionar archivo
+              <input type="file" accept=".txt" class="hidden" @change="handleFileUpload" />
+            </label>
+            <p class="text-xs text-base-content opacity-50 mt-3">
+              El archivo se leerá automáticamente y llenará todos los campos
+            </p>
+          </div>
         </div>
 
         <form @submit.prevent="handleCreateEmail" class="space-y-4">
