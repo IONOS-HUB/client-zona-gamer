@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useRoles } from '@/composables/useRoles'
 import { useGames } from '@/composables/useGames'
-import type { GameSummary, GameEmailAccount, GamePlatform, AccountOwner } from '@/types/game'
+import type { GameSummary, GameEmailAccount, GamePlatform, AccountOwner, AccountType } from '@/types/game'
 
 const router = useRouter()
 const { signOut } = useAuth()
@@ -146,6 +146,98 @@ const formatearPrecio = (precio: number): string => {
     style: 'currency',
     currency: 'USD'
   }).format(precio)
+}
+
+// Función para parsear archivo .txt
+const parsearArchivoTxt = (contenido: string): void => {
+  try {
+    const lineas = contenido.split('\n').map(l => l.trim()).filter(l => l)
+    
+    // Primera línea es el correo
+    const correo = lineas[0] || ''
+    newEmail.value.correo = correo
+    
+    // Buscar cuentas (líneas que contienen "Principal" o "Secundaria")
+    const cuentas: AccountOwner[] = []
+    lineas.forEach(linea => {
+      if (linea.includes('Principal PS4') || linea.includes('Secundaria PS4') || linea.includes('Principal PS5')) {
+        // Extraer tipo de cuenta
+        let tipo: AccountType = 'Principal PS4'
+        if (linea.includes('Secundaria PS4')) tipo = 'Secundaria PS4'
+        else if (linea.includes('Principal PS5')) tipo = 'Principal PS5'
+        
+        // Extraer teléfono (empieza con +593)
+        const telefonoMatch = linea.match(/\+593\s*\d+\s*\d+\s*\d+\s*\d+/)
+        const telefono = telefonoMatch ? telefonoMatch[0].replace(/\s+/g, ' ') : ''
+        
+        // Extraer nombre (texto entre "la tiene" y el teléfono)
+        const nombreMatch = linea.match(/la tiene\s+(.+?)\s+\+593/)
+        const nombre = nombreMatch && nombreMatch[1] ? nombreMatch[1].trim() : ''
+        
+        if (telefono && nombre) {
+          cuentas.push({ tipo, nombre, telefono })
+        }
+      }
+    })
+    newEmail.value.cuentas = cuentas
+    
+    // Buscar nombre del juego
+    const nombreIdx = lineas.findIndex(l => l.startsWith('Nombre:'))
+    if (nombreIdx !== -1 && lineas[nombreIdx]) {
+      newEmail.value.nombre = lineas[nombreIdx]!.replace('Nombre:', '').trim()
+    }
+    
+    // Buscar costo
+    const costoIdx = lineas.findIndex(l => l.startsWith('Costo:'))
+    if (costoIdx !== -1 && lineas[costoIdx]) {
+      const costoStr = lineas[costoIdx]!.replace('Costo:', '').replace('$', '').trim()
+      newEmail.value.costo = parseFloat(costoStr) || 0
+    }
+    
+    // Buscar código (después de "MASTER")
+    const masterIdx = lineas.findIndex(l => l === 'MASTER')
+    if (masterIdx !== -1 && masterIdx + 1 < lineas.length && lineas[masterIdx + 1]) {
+      newEmail.value.codigo = lineas[masterIdx + 1]!
+    }
+    
+    // Buscar código master (la línea más larga, típicamente 80+ caracteres)
+    const codigoMaster = lineas.find(l => l.length > 80 && /^[A-Z0-9]+$/.test(l))
+    if (codigoMaster) {
+      newEmail.value.codigoMaster = codigoMaster
+    }
+    
+    // Buscar códigos generados (líneas de 6 caracteres alfanuméricos)
+    const codigos = lineas.filter(l => l.length === 6 && /^[A-Za-z0-9]+$/.test(l))
+    newEmail.value.codigosGenerados = codigos
+    
+    createSuccess.value = 'Archivo cargado exitosamente'
+    setTimeout(() => { createSuccess.value = '' }, 3000)
+  } catch (error) {
+    console.error('Error parseando archivo:', error)
+    createError.value = 'Error al procesar el archivo. Verifica el formato.'
+  }
+}
+
+const handleFileUpload = (event: Event): void => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  
+  if (!file) return
+  
+  if (!file.name.endsWith('.txt')) {
+    createError.value = 'Por favor selecciona un archivo .txt'
+    return
+  }
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const contenido = e.target?.result as string
+    parsearArchivoTxt(contenido)
+  }
+  reader.readAsText(file)
+  
+  // Limpiar el input para permitir subir el mismo archivo de nuevo
+  input.value = ''
 }
 
 // Funciones para manejar códigos
@@ -763,6 +855,23 @@ onMounted(async () => {
     <dialog :class="['modal', { 'modal-open': showCreateEmail }]">
       <div class="modal-box max-w-4xl">
         <h3 class="font-bold text-lg mb-4">Agregar Correo a {{ juegoSeleccionado?.nombre }}</h3>
+
+        <!-- Botón para subir archivo .txt -->
+        <div class="alert alert-info mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div class="flex-1">
+            <span>¿Tienes un archivo .txt? Súbelo para llenar automáticamente los campos</span>
+          </div>
+          <label class="btn btn-sm btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Subir .txt
+            <input type="file" accept=".txt" class="hidden" @change="handleFileUpload" />
+          </label>
+        </div>
 
         <form @submit.prevent="handleCreateEmail" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
