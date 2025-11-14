@@ -14,6 +14,8 @@ const {
   isLoadingGames,
   cargarJuegos,
   cargarCorreosJuego,
+  crearJuego,
+  actualizarJuego,
   crearCorreoJuego,
   actualizarCorreoJuego,
   eliminarCorreoJuego,
@@ -84,9 +86,19 @@ const selectedEmailDetails = ref<GameEmailAccount | null>(null)
 const showEditPhoto = ref(false)
 const editingGamePhoto = ref<GameSummary | null>(null)
 const newPhotoUrl = ref('')
+const newIsOffert = ref(false)
 const isUpdatingPhoto = ref(false)
 const photoError = ref('')
 const photoSuccess = ref('')
+
+// Estados para crear juego nuevo
+const showCreateGame = ref(false)
+const newGameName = ref('')
+const newGamePhoto = ref('')
+const newGameIsOffert = ref(false)
+const isCreatingGame = ref(false)
+const createGameError = ref('')
+const createGameSuccess = ref('')
 
 
 const juegosFiltrados = computed(() => {
@@ -363,9 +375,60 @@ const cerrarDetalles = (): void => {
   selectedEmailDetails.value = null
 }
 
+const iniciarCreacionJuego = (): void => {
+  newGameName.value = ''
+  newGamePhoto.value = ''
+  newGameIsOffert.value = false
+  createGameError.value = ''
+  createGameSuccess.value = ''
+  showCreateGame.value = true
+}
+
+const handleCreateGame = async (): Promise<void> => {
+  if (!newGameName.value.trim()) {
+    createGameError.value = 'Por favor ingresa el nombre del juego'
+    return
+  }
+
+  isCreatingGame.value = true
+  createGameError.value = ''
+  createGameSuccess.value = ''
+
+  try {
+    await crearJuego(
+      plataformaSeleccionada.value,
+      newGameName.value.trim(),
+      newGamePhoto.value.trim() || undefined,
+      newGameIsOffert.value
+    )
+
+    createGameSuccess.value = 'Juego creado exitosamente'
+    await cargarJuegosPorPlataforma()
+
+    setTimeout(() => {
+      showCreateGame.value = false
+      createGameSuccess.value = ''
+    }, 1500)
+  } catch (error: any) {
+    console.error('Error creando juego:', error)
+    createGameError.value = error.message || 'Error al crear el juego'
+  } finally {
+    isCreatingGame.value = false
+  }
+}
+
+const cerrarCrearJuego = (): void => {
+  showCreateGame.value = false
+  newGameName.value = ''
+  newGamePhoto.value = ''
+  newGameIsOffert.value = false
+  createGameError.value = ''
+}
+
 const iniciarEdicionFoto = (juego: GameSummary): void => {
   editingGamePhoto.value = juego
   newPhotoUrl.value = juego.foto || ''
+  newIsOffert.value = juego.isOffert || false
   photoError.value = ''
   photoSuccess.value = ''
   showEditPhoto.value = true
@@ -374,28 +437,25 @@ const iniciarEdicionFoto = (juego: GameSummary): void => {
 const handleUpdatePhoto = async (): Promise<void> => {
   if (!editingGamePhoto.value) return
 
-  if (!newPhotoUrl.value.trim()) {
-    photoError.value = 'Por favor ingresa una URL válida'
-    return
-  }
-
   isUpdatingPhoto.value = true
   photoError.value = ''
   photoSuccess.value = ''
 
   try {
-    await actualizarFotoJuego(
+    await actualizarJuego(
       plataformaSeleccionada.value,
       editingGamePhoto.value.id,
-      newPhotoUrl.value.trim()
+      newPhotoUrl.value.trim() || undefined,
+      newIsOffert.value
     )
 
-    photoSuccess.value = 'Foto actualizada exitosamente'
+    photoSuccess.value = 'Información actualizada exitosamente'
     
     // Actualizar en la lista local
     const juegoIndex = games.value.findIndex(j => j.id === editingGamePhoto.value?.id)
     if (juegoIndex !== -1) {
       games.value[juegoIndex]!.foto = newPhotoUrl.value.trim()
+      games.value[juegoIndex]!.isOffert = newIsOffert.value
     }
 
     setTimeout(() => {
@@ -404,8 +464,8 @@ const handleUpdatePhoto = async (): Promise<void> => {
       editingGamePhoto.value = null
     }, 1500)
   } catch (error) {
-    console.error('Error actualizando foto:', error)
-    photoError.value = 'Error al actualizar la foto'
+    console.error('Error actualizando información:', error)
+    photoError.value = 'Error al actualizar la información'
   } finally {
     isUpdatingPhoto.value = false
   }
@@ -415,6 +475,7 @@ const cerrarEditarFoto = (): void => {
   showEditPhoto.value = false
   editingGamePhoto.value = null
   newPhotoUrl.value = ''
+  newIsOffert.value = false
   photoError.value = ''
 }
 
@@ -496,22 +557,31 @@ onMounted(() => {
           />
         </div>
 
-        <button 
-          v-if="isAdmin && vistaActual === 'correos'" 
-          class="btn btn-primary"
-          @click="iniciarCreacion"
-        >
-          + Agregar Correo
-        </button>
+        <div v-if="isAdmin" class="flex gap-2">
+          <button 
+            v-if="vistaActual === 'juegos'" 
+            class="btn btn-primary"
+            @click="iniciarCreacionJuego"
+          >
+            + Crear Juego
+          </button>
+          <button 
+            v-if="vistaActual === 'correos'" 
+            class="btn btn-primary"
+            @click="iniciarCreacion"
+          >
+            + Agregar Correo
+          </button>
+        </div>
       </div>
 
       <!-- Mensajes -->
-      <div v-if="createSuccess || editSuccess || deleteSuccess || photoSuccess" class="alert alert-success mb-4">
-        <span>{{ createSuccess || editSuccess || deleteSuccess || photoSuccess }}</span>
+      <div v-if="createSuccess || editSuccess || deleteSuccess || photoSuccess || createGameSuccess" class="alert alert-success mb-4">
+        <span>{{ createSuccess || editSuccess || deleteSuccess || photoSuccess || createGameSuccess }}</span>
       </div>
 
-      <div v-if="deleteError || photoError" class="alert alert-error mb-4">
-        <span>{{ deleteError || photoError }}</span>
+      <div v-if="deleteError || photoError || createGameError" class="alert alert-error mb-4">
+        <span>{{ deleteError || photoError || createGameError }}</span>
       </div>
 
       <!-- Vista de Juegos -->
@@ -965,14 +1035,100 @@ onMounted(() => {
       </form>
     </dialog>
 
+    <!-- Modal para crear juego nuevo -->
+    <dialog :class="['modal', { 'modal-open': showCreateGame }]">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Crear Nuevo Juego</h3>
+        
+        <form @submit.prevent="handleCreateGame" class="space-y-4">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Nombre del Juego *</span>
+            </label>
+            <input
+              v-model="newGameName"
+              type="text"
+              placeholder="Ej: God of War Ragnarök"
+              class="input input-bordered"
+              required
+            />
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">URL de la Foto</span>
+            </label>
+            <input
+              v-model="newGamePhoto"
+              type="url"
+              placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
+              class="input input-bordered"
+            />
+            <label class="label">
+              <span class="label-text-alt">Ingresa la URL completa de la imagen (opcional)</span>
+            </label>
+          </div>
+
+          <!-- Preview de la nueva foto -->
+          <div v-if="newGamePhoto" class="form-control">
+            <label class="label">
+              <span class="label-text">Vista Previa</span>
+            </label>
+            <div class="avatar">
+              <div class="w-32 rounded">
+                <img 
+                  :src="newGamePhoto" 
+                  alt="Preview"
+                  @error="(e) => (e.target as HTMLImageElement).src = ''"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label cursor-pointer">
+              <span class="label-text">¿Está en oferta?</span>
+              <input type="checkbox" v-model="newGameIsOffert" class="toggle toggle-primary" />
+            </label>
+          </div>
+
+          <div v-if="createGameError" class="alert alert-error">
+            <span>{{ createGameError }}</span>
+          </div>
+
+          <div class="modal-action">
+            <button
+              type="button"
+              class="btn"
+              @click="cerrarCrearJuego"
+              :disabled="isCreatingGame"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              :disabled="isCreatingGame"
+            >
+              <span v-if="isCreatingGame" class="loading loading-spinner"></span>
+              {{ isCreatingGame ? 'Creando...' : 'Crear Juego' }}
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="cerrarCrearJuego">close</button>
+      </form>
+    </dialog>
+
     <!-- Modal para editar foto del juego -->
     <dialog :class="['modal', { 'modal-open': showEditPhoto }]">
       <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Editar Foto del Juego</h3>
+        <h3 class="font-bold text-lg mb-4">Editar Información del Juego</h3>
 
         <form @submit.prevent="handleUpdatePhoto" class="space-y-4">
           <div v-if="editingGamePhoto" class="alert alert-info">
-            <span>Editando foto de: {{ editingGamePhoto.nombre }}</span>
+            <span>Editando información de: {{ editingGamePhoto.nombre }}</span>
           </div>
 
           <!-- Preview de la foto actual -->
@@ -989,17 +1145,16 @@ onMounted(() => {
 
           <div class="form-control">
             <label class="label">
-              <span class="label-text">URL de la Foto *</span>
+              <span class="label-text">URL de la Foto</span>
             </label>
             <input
               v-model="newPhotoUrl"
               type="url"
               placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
               class="input input-bordered"
-              required
             />
             <label class="label">
-              <span class="label-text-alt">Ingresa la URL completa de la imagen</span>
+              <span class="label-text-alt">Ingresa la URL completa de la imagen (opcional)</span>
             </label>
           </div>
 
@@ -1017,6 +1172,13 @@ onMounted(() => {
                 />
               </div>
             </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label cursor-pointer">
+              <span class="label-text">¿Está en oferta?</span>
+              <input type="checkbox" v-model="newIsOffert" class="toggle toggle-primary" />
+            </label>
           </div>
 
           <div v-if="photoError" class="alert alert-error">
@@ -1042,7 +1204,7 @@ onMounted(() => {
               :disabled="isUpdatingPhoto"
             >
               <span v-if="isUpdatingPhoto" class="loading loading-spinner"></span>
-              {{ isUpdatingPhoto ? 'Guardando...' : 'Guardar Foto' }}
+              {{ isUpdatingPhoto ? 'Guardando...' : 'Guardar Cambios' }}
             </button>
           </div>
         </form>

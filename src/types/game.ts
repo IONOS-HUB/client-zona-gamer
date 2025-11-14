@@ -31,6 +31,7 @@ export interface GameSummary {
   costo: number
   version: GamePlatform
   foto?: string // URL de la imagen del juego
+  isOffert?: boolean // Si el juego está en oferta
   totalCorreos: number
   correos: string[] // Lista de correos asociados
   descuento?: number // Porcentaje de descuento (0-100)
@@ -38,6 +39,12 @@ export interface GameSummary {
   rating?: number // Calificación (0-5)
   totalReviews?: number // Número de reseñas
   destacado?: boolean // Si debe aparecer en la sección de ofertas
+}
+
+// Datos del documento principal del juego (a_way_out)
+export interface GameDocument {
+  foto?: string
+  isOffert?: boolean
 }
 
 export interface GameFilters {
