@@ -46,8 +46,6 @@ const newEmail = ref({
   codigo: '',
   cuentas: [] as AccountOwner[]
 })
-const newCodigosTexto = ref('')
-const newCuentasTexto = ref('')
 const isCreating = ref(false)
 const createError = ref('')
 const createSuccess = ref('')
@@ -65,8 +63,6 @@ const editEmailData = ref({
   codigo: '',
   cuentas: [] as AccountOwner[]
 })
-const editCodigosTexto = ref('')
-const editCuentasTexto = ref('')
 const isEditing = ref(false)
 const editError = ref('')
 const editSuccess = ref('')
@@ -152,36 +148,46 @@ const formatearPrecio = (precio: number): string => {
   }).format(precio)
 }
 
-const procesarCodigos = (texto: string): string[] => {
-  return texto
-    .split('\n')
-    .map(codigo => codigo.trim())
-    .filter(codigo => codigo.length > 0)
+// Funciones para manejar códigos
+const agregarCodigo = (isEdit: boolean = false): void => {
+  const nuevoCodigo = prompt('Ingresa el nuevo código:')
+  if (nuevoCodigo && nuevoCodigo.trim()) {
+    if (isEdit) {
+      editEmailData.value.codigosGenerados.push(nuevoCodigo.trim())
+    } else {
+      newEmail.value.codigosGenerados.push(nuevoCodigo.trim())
+    }
+  }
 }
 
-const procesarCuentas = (texto: string): AccountOwner[] => {
-  // Formato esperado: tipo|nombre|telefono (uno por línea)
-  // Ejemplo: Principal PS4|19998 Ps4|+593 99 358 6097
-  return texto
-    .split('\n')
-    .map(linea => linea.trim())
-    .filter(linea => linea.length > 0)
-    .map(linea => {
-      const partes = linea.split('|')
-      if (partes.length >= 3) {
-        return {
-          tipo: partes[0]?.trim() as any,
-          nombre: partes[1]?.trim(),
-          telefono: partes[2]?.trim()
-        }
-      }
-      return null
-    })
-    .filter(cuenta => cuenta !== null) as AccountOwner[]
+const eliminarCodigo = (index: number, isEdit: boolean = false): void => {
+  if (isEdit) {
+    editEmailData.value.codigosGenerados.splice(index, 1)
+  } else {
+    newEmail.value.codigosGenerados.splice(index, 1)
+  }
 }
 
-const cuentasATexto = (cuentas: AccountOwner[]): string => {
-  return cuentas.map(c => `${c.tipo}|${c.nombre}|${c.telefono}`).join('\n')
+// Funciones para manejar cuentas
+const agregarCuenta = (isEdit: boolean = false): void => {
+  const nuevaCuenta: AccountOwner = {
+    tipo: 'Principal PS4',
+    nombre: '',
+    telefono: ''
+  }
+  if (isEdit) {
+    editEmailData.value.cuentas.push(nuevaCuenta)
+  } else {
+    newEmail.value.cuentas.push(nuevaCuenta)
+  }
+}
+
+const eliminarCuenta = (index: number, isEdit: boolean = false): void => {
+  if (isEdit) {
+    editEmailData.value.cuentas.splice(index, 1)
+  } else {
+    newEmail.value.cuentas.splice(index, 1)
+  }
 }
 
 const iniciarCreacion = (): void => {
@@ -198,8 +204,6 @@ const iniciarCreacion = (): void => {
     codigo: juegoSeleccionado.value.id,
     cuentas: []
   }
-  newCodigosTexto.value = ''
-  newCuentasTexto.value = ''
   createError.value = ''
   createSuccess.value = ''
   showCreateEmail.value = true
@@ -216,13 +220,8 @@ const handleCreateEmail = async (): Promise<void> => {
   createSuccess.value = ''
 
   try {
-    const codigos = procesarCodigos(newCodigosTexto.value)
-    const cuentas = procesarCuentas(newCuentasTexto.value)
-
     const emailData = {
       ...newEmail.value,
-      codigosGenerados: codigos,
-      cuentas,
       createdBy: currentUserData.value?.uid
     }
 
@@ -258,10 +257,8 @@ const iniciarEdicion = (email: GameEmailAccount): void => {
     codigosGenerados: [...email.codigosGenerados],
     fecha: email.fecha,
     codigo: email.codigo,
-    cuentas: [...email.cuentas]
+    cuentas: JSON.parse(JSON.stringify(email.cuentas)) // Deep copy
   }
-  editCodigosTexto.value = email.codigosGenerados.join('\n')
-  editCuentasTexto.value = cuentasATexto(email.cuentas)
   editError.value = ''
   editSuccess.value = ''
   showEditEmail.value = true
@@ -275,9 +272,6 @@ const handleEditEmail = async (): Promise<void> => {
   editSuccess.value = ''
 
   try {
-    const codigos = procesarCodigos(editCodigosTexto.value)
-    const cuentas = procesarCuentas(editCuentasTexto.value)
-
     await actualizarCorreoJuego(
       plataformaSeleccionada.value,
       juegoSeleccionado.value.id,
@@ -286,9 +280,9 @@ const handleEditEmail = async (): Promise<void> => {
         nombre: editEmailData.value.nombre,
         costo: editEmailData.value.costo,
         codigoMaster: editEmailData.value.codigoMaster,
-        codigosGenerados: codigos,
+        codigosGenerados: editEmailData.value.codigosGenerados,
         codigo: editEmailData.value.codigo,
-        cuentas
+        cuentas: editEmailData.value.cuentas
       }
     )
 
@@ -486,10 +480,12 @@ const handleLogout = async (): Promise<void> => {
 }
 
 const volverAlPanel = (): void => {
-  if (isAdmin.value) {
+  if (currentUserData.value?.role === 'admin') {
     router.push('/admin')
-  } else {
+  } else if (currentUserData.value?.role === 'employee') {
     router.push('/employee')
+  } else {
+    router.push('/')
   }
 }
 
@@ -557,7 +553,7 @@ onMounted(() => {
           />
         </div>
 
-        <div v-if="isAdmin" class="flex gap-2">
+        <div v-if="hasEmployeeAccess" class="flex gap-2">
           <button 
             v-if="vistaActual === 'juegos'" 
             class="btn btn-primary"
@@ -653,7 +649,7 @@ onMounted(() => {
                         Ver Correos
                       </button>
                       <button
-                        v-if="isAdmin"
+                        v-if="hasEmployeeAccess"
                         class="btn btn-sm btn-warning"
                         @click="iniciarEdicionFoto(juego)"
                       >
@@ -662,7 +658,7 @@ onMounted(() => {
                         </svg>
                       </button>
                       <button
-                        v-if="isAdmin"
+                        v-if="hasEmployeeAccess"
                         class="btn btn-sm btn-error"
                         @click="iniciarEliminacionJuego(juego)"
                       >
@@ -735,7 +731,7 @@ onMounted(() => {
                         </svg>
                       </button>
                       <button
-                        v-if="isAdmin"
+                        v-if="hasEmployeeAccess"
                         class="btn btn-sm btn-primary"
                         @click="iniciarEdicion(email)"
                       >
@@ -744,7 +740,7 @@ onMounted(() => {
                         </svg>
                       </button>
                       <button
-                        v-if="isAdmin"
+                        v-if="hasEmployeeAccess"
                         class="btn btn-sm btn-error"
                         @click="iniciarEliminacionCorreo(email)"
                       >
@@ -819,29 +815,59 @@ onMounted(() => {
             ></textarea>
           </div>
 
+          <!-- Códigos Generados -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Códigos Generados (uno por línea)</span>
-            </label>
-            <textarea
-              v-model="newCodigosTexto"
-              class="textarea textarea-bordered h-32"
-              placeholder="wGQHtn&#10;MyEj7B&#10;RMe3kn"
-            ></textarea>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Códigos Generados ({{ newEmail.codigosGenerados.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCodigo(false)">
+                + Agregar Código
+              </button>
+            </div>
+            <div v-if="newEmail.codigosGenerados.length > 0" class="space-y-2 max-h-40 overflow-y-auto border border-base-300 rounded p-2">
+              <div v-for="(codigo, index) in newEmail.codigosGenerados" :key="index" class="flex items-center gap-2 bg-base-200 p-2 rounded">
+                <span class="flex-1 font-mono text-sm">{{ codigo }}</span>
+                <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCodigo(index, false)">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay códigos agregados
+            </div>
           </div>
 
+          <!-- Cuentas -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Cuentas (formato: tipo|nombre|teléfono)</span>
-            </label>
-            <textarea
-              v-model="newCuentasTexto"
-              class="textarea textarea-bordered h-32"
-              placeholder="Principal PS4|19998 Ps4|+593 99 358 6097&#10;Secundaria PS4|Frank Fc PS4|+593 98 777 1379"
-            ></textarea>
-            <label class="label">
-              <span class="label-text-alt">Formato: tipo|nombre|teléfono (uno por línea)</span>
-            </label>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Cuentas ({{ newEmail.cuentas.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCuenta(false)">
+                + Agregar Cuenta
+              </button>
+            </div>
+            <div v-if="newEmail.cuentas.length > 0" class="space-y-3 max-h-60 overflow-y-auto border border-base-300 rounded p-3">
+              <div v-for="(cuenta, index) in newEmail.cuentas" :key="index" class="bg-base-200 p-3 rounded space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-sm">Cuenta {{ index + 1 }}</span>
+                  <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCuenta(index, false)">
+                    ✕
+                  </button>
+                </div>
+                <select v-model="cuenta.tipo" class="select select-bordered select-sm w-full">
+                  <option value="Principal PS4">Principal PS4</option>
+                  <option value="Secundaria PS4">Secundaria PS4</option>
+                  <option value="Principal PS5">Principal PS5</option>
+                </select>
+                <input v-model="cuenta.nombre" type="text" placeholder="Nombre" class="input input-bordered input-sm w-full" />
+                <input v-model="cuenta.telefono" type="text" placeholder="Teléfono" class="input input-bordered input-sm w-full" />
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay cuentas agregadas
+            </div>
           </div>
 
           <div v-if="createError" class="alert alert-error">
@@ -923,27 +949,59 @@ onMounted(() => {
             ></textarea>
           </div>
 
+          <!-- Códigos Generados -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Códigos Generados (uno por línea)</span>
-            </label>
-            <textarea
-              v-model="editCodigosTexto"
-              class="textarea textarea-bordered h-32"
-            ></textarea>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Códigos Generados ({{ editEmailData.codigosGenerados.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCodigo(true)">
+                + Agregar Código
+              </button>
+            </div>
+            <div v-if="editEmailData.codigosGenerados.length > 0" class="space-y-2 max-h-40 overflow-y-auto border border-base-300 rounded p-2">
+              <div v-for="(codigo, index) in editEmailData.codigosGenerados" :key="index" class="flex items-center gap-2 bg-base-200 p-2 rounded">
+                <span class="flex-1 font-mono text-sm">{{ codigo }}</span>
+                <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCodigo(index, true)">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay códigos agregados
+            </div>
           </div>
 
+          <!-- Cuentas -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Cuentas (formato: tipo|nombre|teléfono)</span>
-            </label>
-            <textarea
-              v-model="editCuentasTexto"
-              class="textarea textarea-bordered h-32"
-            ></textarea>
-            <label class="label">
-              <span class="label-text-alt">Formato: tipo|nombre|teléfono (uno por línea)</span>
-            </label>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Cuentas ({{ editEmailData.cuentas.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCuenta(true)">
+                + Agregar Cuenta
+              </button>
+            </div>
+            <div v-if="editEmailData.cuentas.length > 0" class="space-y-3 max-h-60 overflow-y-auto border border-base-300 rounded p-3">
+              <div v-for="(cuenta, index) in editEmailData.cuentas" :key="index" class="bg-base-200 p-3 rounded space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-sm">Cuenta {{ index + 1 }}</span>
+                  <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCuenta(index, true)">
+                    ✕
+                  </button>
+                </div>
+                <select v-model="cuenta.tipo" class="select select-bordered select-sm w-full">
+                  <option value="Principal PS4">Principal PS4</option>
+                  <option value="Secundaria PS4">Secundaria PS4</option>
+                  <option value="Principal PS5">Principal PS5</option>
+                </select>
+                <input v-model="cuenta.nombre" type="text" placeholder="Nombre" class="input input-bordered input-sm w-full" />
+                <input v-model="cuenta.telefono" type="text" placeholder="Teléfono" class="input input-bordered input-sm w-full" />
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay cuentas agregadas
+            </div>
           </div>
 
           <div v-if="editError" class="alert alert-error">
