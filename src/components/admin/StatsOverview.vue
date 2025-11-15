@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGames } from '@/composables/useGames'
-import type { GamePlatform } from '@/types/game'
-import { BarChart3, TrendingUp, Package, Filter, Search, RefreshCw } from 'lucide-vue-next'
+import type { GamePlatform, GameSummary } from '@/types/game'
+import { BarChart3, TrendingUp, Package, Filter, Search, RefreshCw, ArrowRight } from 'lucide-vue-next'
 
 interface Props {
   readOnly?: boolean
@@ -12,6 +13,7 @@ const props = withDefaults(defineProps<Props>(), {
   readOnly: false
 })
 
+const router = useRouter()
 const { games, cargarJuegos, cargando } = useGames()
 
 // Estados de filtros
@@ -136,6 +138,16 @@ const limpiarFiltros = (): void => {
 
 const toggleSortOrder = (): void => {
   sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+}
+
+const verDetallesJuego = (juego: GameSummary): void => {
+  // Navegamos a /games pasando el juego completo como state
+  router.push({
+    path: '/games',
+    state: {
+      openGame: juego
+    }
+  })
 }
 </script>
 
@@ -358,7 +370,7 @@ const toggleSortOrder = (): void => {
         </div>
 
         <div v-else class="overflow-x-auto">
-          <table class="table table-zebra">
+            <table class="table table-zebra">
             <thead>
               <tr>
                 <th>Foto</th>
@@ -367,10 +379,16 @@ const toggleSortOrder = (): void => {
                 <th>Precio</th>
                 <th>Cuentas</th>
                 <th>Promoción</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="juego in juegosFiltrados" :key="juego.id">
+              <tr 
+                v-for="juego in juegosFiltrados" 
+                :key="juego.id"
+                class="hover:bg-base-200 cursor-pointer transition-colors"
+                @click="verDetallesJuego(juego)"
+              >
                 <td>
                   <div class="avatar">
                     <div class="w-12 h-12 rounded">
@@ -422,6 +440,15 @@ const toggleSortOrder = (): void => {
                   >
                     Normal
                   </span>
+                </td>
+                <td>
+                  <button 
+                    @click.stop="verDetallesJuego(juego)"
+                    class="btn btn-sm btn-ghost gap-2 hover:btn-primary"
+                  >
+                    Ver detalles
+                    <ArrowRight :size="16" />
+                  </button>
                 </td>
               </tr>
             </tbody>

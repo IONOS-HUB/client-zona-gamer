@@ -663,7 +663,31 @@ const volverAlPanel = (): void => {
 
 onMounted(async () => {
   await loadUserData()
-  cargarJuegosPorPlataforma()
+  
+  // Verificar si hay un juego para abrir desde el state del router
+  const openGame = window.history.state?.openGame as GameSummary | undefined
+  
+  if (openGame) {
+    // Si viene un juego desde el dashboard, siempre cargar desde PS4 & PS5
+    plataformaSeleccionada.value = 'PS4 & PS5'
+    
+    // Cargar todos los juegos
+    await cargarJuegos('PS4 & PS5')
+    
+    // Buscar el juego en la lista cargada (por si el estado tiene datos desactualizados)
+    const juegoActualizado = games.value.find(g => g.id === openGame.id)
+    
+    if (juegoActualizado) {
+      // Mostrar directamente los correos de ese juego
+      await verCorreosJuego(juegoActualizado)
+    } else {
+      // Si no se encuentra, intentar con el juego del state original
+      await verCorreosJuego(openGame)
+    }
+  } else {
+    // Navegación normal, cargar la plataforma por defecto
+    cargarJuegosPorPlataforma()
+  }
 })
 </script>
 
