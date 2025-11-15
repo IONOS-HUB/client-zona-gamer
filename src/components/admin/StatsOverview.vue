@@ -283,6 +283,10 @@ const verDetallesJuego = (juego: GameSummary): void => {
                 type="text" 
                 placeholder="Nombre del juego..." 
                 class="input input-bordered w-full pl-10"
+                autocomplete="off"
+                data-form-type="other"
+                data-lpignore="true"
+                data-1p-ignore="true"
               />
               <Search :size="20" class="absolute left-3 top-3 text-base-content/40" />
             </div>
