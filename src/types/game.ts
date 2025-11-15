@@ -1,6 +1,8 @@
-export type GamePlatform = 'PS4 & PS5' | 'PS4' | 'PS5' | 'Xbox' | 'Nintendo Switch'
+export type GamePlatform = 'PS4 & PS5' | 'PS4' | 'PS5'
 
 export type AccountType = 'Principal PS4' | 'Secundaria PS4' | 'Principal PS5'
+
+export type PromocionType = 'ninguna' | 'oferta' | 'promocion'
 
 export interface AccountOwner {
   nombre: string
@@ -31,6 +33,8 @@ export interface GameSummary {
   costo: number
   version: GamePlatform
   foto?: string // URL de la imagen del juego
+  isOffert?: boolean // Si el juego está en oferta (legacy - mantener por compatibilidad)
+  tipoPromocion?: PromocionType // Tipo de promoción: ninguna, oferta o promocion
   totalCorreos: number
   correos: string[] // Lista de correos asociados
   descuento?: number // Porcentaje de descuento (0-100)
@@ -38,6 +42,17 @@ export interface GameSummary {
   rating?: number // Calificación (0-5)
   totalReviews?: number // Número de reseñas
   destacado?: boolean // Si debe aparecer en la sección de ofertas
+}
+
+// Datos del documento principal del juego (a_way_out)
+export interface GameDocument {
+  nombre?: string
+  foto?: string
+  version?: GamePlatform // Categoría del juego: PS4, PS5, PS4 & PS5, etc.
+  isOffert?: boolean // Legacy - mantener por compatibilidad
+  tipoPromocion?: PromocionType
+  costo?: number // Precio actual del juego (actualizado por el último correo)
+  ultimaActualizacionPrecio?: Date // Fecha del último correo que actualizó el precio
 }
 
 export interface GameFilters {

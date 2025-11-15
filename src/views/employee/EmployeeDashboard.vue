@@ -1,92 +1,98 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useRoles } from '@/composables/useRoles'
+import { BarChart3, Gamepad2, Home } from 'lucide-vue-next'
+import StatsOverview from '@/components/admin/StatsOverview.vue'
 
 const router = useRouter()
 const { signOut } = useAuth()
 const { currentUserData } = useRoles()
 
+const activeTab = ref<'stats'>('stats')
+
 const handleLogout = async (): Promise<void> => {
   await signOut()
   router.push('/login')
+}
+
+const irAHome = (): void => {
+  router.push('/')
 }
 </script>
 
 <template>
   <div class="min-h-screen bg-base-200">
     <!-- Navbar -->
-    <div class="navbar bg-base-100 shadow-lg">
+    <div class="navbar bg-base-100 shadow-lg border-b border-white/10">
       <div class="flex-1">
-        <a class="btn btn-ghost text-xl">Panel de Empleado</a>
+        <a class="btn btn-ghost text-xl font-bold">
+          <BarChart3 :size="24" class="text-warning" />
+          Panel de Empleado
+        </a>
       </div>
       <div class="flex-none gap-2">
+        <button @click="irAHome" class="btn btn-ghost gap-2">
+          <Home :size="20" />
+          <span class="hidden md:inline">Ir a la Tienda</span>
+        </button>
         <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost">
-            {{ currentUserData?.email }}
+          <div tabindex="0" role="button" class="btn btn-ghost gap-2">
+            <div class="avatar placeholder">
+              <div class="bg-warning text-warning-content rounded-full w-8">
+                <span class="text-xs">{{ currentUserData?.email?.charAt(0).toUpperCase() }}</span>
+              </div>
+            </div>
+            <span class="hidden md:inline">{{ currentUserData?.email }}</span>
           </div>
           <ul
             tabindex="0"
-            class="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52"
+            class="mt-3 z-100 p-2 shadow-lg menu menu-sm dropdown-content bg-base-100 rounded-box w-52 border border-white/10"
           >
-            <li><a @click="handleLogout">Cerrar Sesión</a></li>
+            <li class="menu-title">
+              <span class="text-xs">Empleado</span>
+            </li>
+            <div class="divider my-1"></div>
+            <li><a @click="handleLogout" class="text-error">Cerrar Sesión</a></li>
           </ul>
         </div>
       </div>
     </div>
 
-    <!-- Contenido -->
-    <div class="container mx-auto p-6">
-      <div class="hero min-h-[60vh] bg-base-100 rounded-lg shadow-xl">
-        <div class="hero-content text-center">
-          <div class="max-w-md">
-            <h1 class="text-4xl font-bold">
-              ¡Bienvenido, {{ currentUserData?.displayName || 'Empleado' }}!
-            </h1>
-            <p class="py-6">
-              Este es tu panel de empleado. Aquí podrás gestionar las tareas asignadas.
-            </p>
-            <div class="stats shadow">
-              <div class="stat">
-                <div class="stat-title">Rol</div>
-                <div class="stat-value text-primary">Empleado</div>
-                <div class="stat-desc">{{ currentUserData?.email }}</div>
-              </div>
-            </div>
-          </div>
+    <!-- Tabs de Navegación -->
+    <div class="bg-base-100 border-b border-white/10 sticky top-0 z-50">
+      <div class="container mx-auto">
+        <div class="tabs tabs-boxed bg-transparent gap-2 p-4">
+          <button 
+            @click="activeTab = 'stats'" 
+            :class="['tab gap-2 transition-all', activeTab === 'stats' ? 'tab-active' : '']"
+          >
+            <BarChart3 :size="18" />
+            Estadísticas
+          </button>
+          <button 
+            @click="router.push('/games')" 
+            class="tab gap-2 transition-all hover:tab-active"
+          >
+            <Gamepad2 :size="18" />
+            Consulta de Juegos
+          </button>
         </div>
       </div>
+    </div>
 
-      <!-- Sección de funcionalidades -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-        <div class="card bg-base-100 shadow-xl cursor-pointer hover:shadow-2xl transition-shadow" @click="router.push('/games')">
-          <div class="card-body">
-            <h2 class="card-title">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
-              </svg>
-              Gestión de Juegos
-            </h2>
-            <p>Consulta y gestiona el catálogo de juegos</p>
-            <div class="badge badge-success">Disponible</div>
-          </div>
+    <!-- Contenido por Tab -->
+    <div class="container mx-auto p-6">
+      <!-- Tab: Estadísticas -->
+      <div v-if="activeTab === 'stats'">
+        <div class="alert alert-info mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span><strong>Modo Solo Lectura:</strong> Como empleado, puedes consultar las estadísticas pero no modificar datos.</span>
         </div>
-
-        <div class="card bg-base-100 shadow-xl">
-          <div class="card-body">
-            <h2 class="card-title">Pedidos</h2>
-            <p>Gestiona los pedidos de los clientes</p>
-            <div class="badge badge-primary">Próximamente</div>
-          </div>
-        </div>
-
-        <div class="card bg-base-100 shadow-xl">
-          <div class="card-body">
-            <h2 class="card-title">Reportes</h2>
-            <p>Genera reportes de ventas</p>
-            <div class="badge badge-primary">Próximamente</div>
-          </div>
-        </div>
+        <StatsOverview :read-only="true" />
       </div>
     </div>
   </div>

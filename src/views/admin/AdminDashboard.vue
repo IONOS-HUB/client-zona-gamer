@@ -8,10 +8,15 @@ import { auth } from '@/config/firebase'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { AppUser, UserRole } from '@/types/user'
+import { BarChart3, Users, Gamepad2, Home } from 'lucide-vue-next'
+import StatsOverview from '@/components/admin/StatsOverview.vue'
 
 const router = useRouter()
 const { signOut } = useAuth()
 const { currentUserData, createUserWithRole, loadUserData, updateUserRole, updateUserData, deleteUser } = useRoles()
+
+// Estado para el tab activo
+const activeTab = ref<'stats' | 'users'>('stats')
 
 // Estados para crear usuario
 const showCreateEmployee = ref(false)
@@ -277,46 +282,100 @@ const handleLogout = async (): Promise<void> => {
 onMounted(() => {
   loadEmployees()
 })
+
+const irAHome = (): void => {
+  router.push('/')
+}
 </script>
 
 <template>
   <div class="min-h-screen bg-base-200">
     <!-- Navbar -->
-    <div class="navbar bg-base-100 shadow-lg">
+    <div class="navbar bg-base-100 shadow-lg border-b border-white/10">
       <div class="flex-1">
-        <a class="btn btn-ghost text-xl">Panel de Administración</a>
+        <a class="btn btn-ghost text-xl font-bold">
+          <BarChart3 :size="24" class="text-primary" />
+          Panel de Administración
+        </a>
       </div>
       <div class="flex-none gap-2">
+        <button @click="irAHome" class="btn btn-ghost gap-2">
+          <Home :size="20" />
+          <span class="hidden md:inline">Ir a la Tienda</span>
+        </button>
         <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost">
-            {{ currentUserData?.email }}
+          <div tabindex="0" role="button" class="btn btn-ghost gap-2">
+            <div class="avatar placeholder">
+              <div class="bg-primary text-primary-content rounded-full w-8">
+                <span class="text-xs">{{ currentUserData?.email?.charAt(0).toUpperCase() }}</span>
+              </div>
+            </div>
+            <span class="hidden md:inline">{{ currentUserData?.email }}</span>
           </div>
           <ul
             tabindex="0"
-            class="mt-3 z-1 p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52"
+            class="mt-3 z-100 p-2 shadow-lg menu menu-sm dropdown-content bg-base-100 rounded-box w-52 border border-white/10"
           >
-            <li><a @click="handleLogout">Cerrar Sesión</a></li>
+            <li class="menu-title">
+              <span class="text-xs">Administrador</span>
+            </li>
+            <div class="divider my-1"></div>
+            <li><a @click="handleLogout" class="text-error">Cerrar Sesión</a></li>
           </ul>
         </div>
       </div>
     </div>
 
-    <!-- Contenido -->
-    <div class="container mx-auto p-6">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold">Bienvenido, Admin</h1>
-        <div class="flex gap-2">
-          <button class="btn btn-secondary" @click="router.push('/games')">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
-            </svg>
-            Gestión de Juegos
+    <!-- Tabs de Navegación -->
+    <div class="bg-base-100 border-b border-white/10 sticky top-0 z-50">
+      <div class="container mx-auto">
+        <div class="tabs tabs-boxed bg-transparent gap-2 p-4">
+          <button 
+            @click="activeTab = 'stats'" 
+            :class="['tab gap-2 transition-all', activeTab === 'stats' ? 'tab-active' : '']"
+          >
+            <BarChart3 :size="18" />
+            Estadísticas
           </button>
-          <button class="btn btn-primary" @click="showCreateEmployee = true">
-            + Crear Usuario
+          <button 
+            @click="activeTab = 'users'" 
+            :class="['tab gap-2 transition-all', activeTab === 'users' ? 'tab-active' : '']"
+          >
+            <Users :size="18" />
+            Gestión de Usuarios
+          </button>
+          <button 
+            @click="router.push('/games')" 
+            class="tab gap-2 transition-all hover:tab-active"
+          >
+            <Gamepad2 :size="18" />
+            Gestión de Juegos
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Contenido por Tab -->
+    <div class="container mx-auto p-6">
+      <!-- Tab: Estadísticas -->
+      <div v-if="activeTab === 'stats'">
+        <StatsOverview :read-only="false" />
+      </div>
+
+      <!-- Tab: Gestión de Usuarios -->
+      <div v-if="activeTab === 'users'">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h1 class="text-3xl font-bold">Gestión de Usuarios</h1>
+            <p class="text-base-content/60 mt-1">Administra los usuarios del sistema</p>
+          </div>
+          <button class="btn btn-primary gap-2" @click="showCreateEmployee = true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Crear Usuario
+          </button>
+        </div>
 
       <!-- Mensaje de éxito de creación -->
       <div v-if="createSuccess" class="alert alert-success mb-4">
@@ -452,6 +511,7 @@ onMounted(() => {
             </table>
           </div>
         </div>
+      </div>
       </div>
     </div>
 

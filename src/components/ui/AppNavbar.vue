@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { useRoles } from '@/composables/useRoles'
 import { useCartStore } from '@/stores/cart'
-import { Search, ShoppingCart, User, Send, Gamepad2 } from 'lucide-vue-next'
+import { Search, ShoppingCart, User, Send, Gamepad2, LayoutDashboard } from 'lucide-vue-next'
 import type { GamePlatform } from '@/types/game'
+import logo from '/Images/logo/logo.png'
 
 const router = useRouter()
 const { currentUser, signOut } = useAuth()
+const { currentUserData, isAdmin, hasEmployeeAccess, loadUserData } = useRoles()
 const cartStore = useCartStore()
 
 const searchQuery = ref('')
@@ -28,6 +31,20 @@ const handleLogout = async (): Promise<void> => {
 const irALogin = (): void => {
   router.push('/login')
 }
+
+const irAlDashboard = (): void => {
+  if (isAdmin.value) {
+    router.push('/admin')
+  } else if (hasEmployeeAccess.value) {
+    router.push('/employee')
+  }
+}
+
+onMounted(() => {
+  if (currentUser.value) {
+    loadUserData()
+  }
+})
 
 const openCart = (): void => {
   emit('openCart')
@@ -111,6 +128,7 @@ const formatearPrecio = (precio: number): string => {
 }
 
 const platforms: { id: GamePlatform; label: string; icon: string }[] = [
+  { id: 'PS4 & PS5', label: 'Todos', icon: 'ALL' },
   { id: 'PS4', label: 'PS4', icon: 'PS4' },
   { id: 'PS5', label: 'PS5', icon: 'PS5' }
 ]
@@ -123,15 +141,13 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
       <div class="container mx-auto px-4">
         <div class="flex items-center justify-between py-4 gap-6 animate-fadeInUp">
           <!-- Logo -->
-          <a 
-            @click="router.push('/')" 
-            class="flex flex-col items-start cursor-pointer hover:scale-105 transition-all duration-300 flex-shrink-0 group"
-          >
-            <div class="flex items-baseline">
-              <span class="text-2xl font-black text-gradient-animated tracking-tight">ZONA</span>
-              <span class="text-2xl font-black text-white tracking-tight ml-1 group-hover:text-error transition-colors duration-300">GAMERS</span>
-            </div>
-            <span class="text-xs text-error font-semibold tracking-wider -mt-1 group-hover:tracking-widest transition-all duration-300">ECUADOR</span>
+          <a href="/" class="flex items-center gap-2">
+          <img 
+            :src="logo" 
+            alt="Zona Gamers" 
+            class="w-30  object-contain"
+            />
+            />
           </a>
 
           <!-- Centro: Filtros de Plataformas (PS4 y PS5) y Buscador -->
@@ -144,12 +160,12 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
                 @click="handlePlatformChange(platform.id)"
                 :class="[
                   'flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-300 hover:scale-105',
-                  selectedPlatform === platform.id || selectedPlatform === 'PS4 & PS5'
+                  selectedPlatform === platform.id
                     ? 'text-white bg-error/20 border border-error/50 shadow-glow'
                     : 'text-base-content/70 hover:text-white hover:bg-white/5 border border-transparent'
                 ]"
               >
-                <Gamepad2 :size="20" class="flex-shrink-0" />
+                <Gamepad2 :size="20" class="shrink-0" />
                 <span class="text-sm">{{ platform.label }}</span>
               </button>
             </div>
@@ -160,7 +176,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <button
                 v-if="!isSearchExpanded"
                 @click="toggleSearch"
-                class="btn btn-circle bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 hover:from-orange-600 hover:to-red-600 border-none shadow-lg text-white transition-all duration-300 hover:scale-110 w-12 h-12"
+                class="btn btn-circle bg-linear-gradient(to right, #dc2626, #991b1b) hover:from-orange-600 hover:to-red-600 border-none shadow-lg text-white transition-all duration-300 hover:scale-110 w-12 h-12"
               >
                 <Search :size="20" />
               </button>
@@ -174,7 +190,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
                   v-model="searchQuery"
                   type="text"
                   placeholder="Minecraft, RPG, multijugador..."
-                  class="input bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 border-none text-white placeholder:text-orange-100/90 pl-6 pr-12 rounded-full shadow-lg transition-all duration-300 w-80 focus:outline-none focus:ring-2 focus:ring-orange-400/50 text-base"
+                  class="input bg-linear-gradient(to right, #dc2626, #991b1b) border-none text-white placeholder:text-orange-100/90 pl-6 pr-12 rounded-full shadow-lg transition-all duration-300 w-80 focus:outline-none focus:ring-2 focus:ring-orange-400/50 text-base"
                   @keyup.enter="handleSearch"
                   @blur="handleSearchBlur"
                   autofocus
@@ -192,7 +208,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
           </div>
 
           <!-- Acciones (Usuario y Carrito) -->
-          <div class="flex items-center gap-2 flex-shrink-0 animate-fadeInUp delay-200">
+          <div class="flex items-center gap-2 shrink-0 animate-fadeInUp delay-200">
             <!-- Botón Usuario -->
             <div v-if="currentUser" class="dropdown dropdown-end">
               <div 
@@ -204,14 +220,38 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               </div>
               <ul
                 tabindex="0"
-                class="mt-3 z-[1] p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-52 border border-white/10 animate-scaleIn"
+                class="mt-3 z-100 p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-60 border border-white/10 animate-scaleIn"
               >
+                <!-- Información del usuario -->
                 <li class="menu-title">
-                  <span class="text-xs">{{ currentUser.email }}</span>
+                  <div class="flex flex-col gap-1 py-2">
+                    <span class="text-xs font-semibold text-base-content/90">{{ currentUser.email }}</span>
+                    <span v-if="currentUserData" class="text-xs badge badge-sm" :class="isAdmin ? 'badge-error' : hasEmployeeAccess ? 'badge-warning' : 'badge-ghost'">
+                      {{ isAdmin ? 'Administrador' : hasEmployeeAccess ? 'Empleado' : 'Cliente' }}
+                    </span>
+                  </div>
                 </li>
-                <li><a class="hover:bg-error/20 hover:text-error transition-all">Mis Pedidos</a></li>
-                <li><a class="hover:bg-primary/20 hover:text-primary transition-all">Configuración</a></li>
-                <li><a @click="handleLogout" class="text-error hover:bg-error/20 transition-all">Cerrar Sesión</a></li>
+                
+                <div class="divider my-1"></div>
+                
+                <!-- Opción Dashboard (solo para admin y empleados) -->
+                <li v-if="isAdmin || hasEmployeeAccess">
+                  <a @click="irAlDashboard" class="hover:bg-primary/20 hover:text-primary transition-all gap-3">
+                    <LayoutDashboard :size="18" />
+                    <span>Panel de Control</span>
+                  </a>
+                </li>
+                <div class="divider my-1"></div>
+                
+                <!-- Cerrar sesión -->
+                <li>
+                  <a @click="handleLogout" class="text-error hover:bg-error/20 transition-all gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Cerrar Sesión</span>
+                  </a>
+                </li>
               </ul>
             </div>
             <button v-else @click="irALogin" class="btn btn-ghost btn-circle hover:bg-primary/20 hover:shadow-glow-primary transition-all duration-300 hover:scale-110">
@@ -239,7 +279,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <!-- Dropdown del carrito -->
               <div
                 tabindex="0"
-                class="mt-3 z-[1] card card-compact dropdown-content w-80 shadow-xl border border-white/10 animate-fadeInUp bg-base-100"
+                class="mt-3 z-1 card card-compact dropdown-content w-80 shadow-xl border border-white/10 animate-fadeInUp bg-base-100"
               >
                 <div class="card-body">
                   <div class="flex items-center justify-between mb-2">

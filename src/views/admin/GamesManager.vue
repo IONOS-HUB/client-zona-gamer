@@ -4,16 +4,18 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useRoles } from '@/composables/useRoles'
 import { useGames } from '@/composables/useGames'
-import type { GameSummary, GameEmailAccount, GamePlatform, AccountOwner } from '@/types/game'
+import type { GameSummary, GameEmailAccount, GamePlatform, AccountOwner, AccountType } from '@/types/game'
 
 const router = useRouter()
 const { signOut } = useAuth()
-const { currentUserData, isAdmin, hasEmployeeAccess } = useRoles()
+const { currentUserData, isAdmin, hasEmployeeAccess, loadUserData } = useRoles()
 const {
   games,
   isLoadingGames,
   cargarJuegos,
   cargarCorreosJuego,
+  crearJuego,
+  actualizarJuego,
   crearCorreoJuego,
   actualizarCorreoJuego,
   eliminarCorreoJuego,
@@ -44,8 +46,6 @@ const newEmail = ref({
   codigo: '',
   cuentas: [] as AccountOwner[]
 })
-const newCodigosTexto = ref('')
-const newCuentasTexto = ref('')
 const isCreating = ref(false)
 const createError = ref('')
 const createSuccess = ref('')
@@ -63,8 +63,6 @@ const editEmailData = ref({
   codigo: '',
   cuentas: [] as AccountOwner[]
 })
-const editCodigosTexto = ref('')
-const editCuentasTexto = ref('')
 const isEditing = ref(false)
 const editError = ref('')
 const editSuccess = ref('')
@@ -80,13 +78,26 @@ const deleteSuccess = ref('')
 const showEmailDetails = ref(false)
 const selectedEmailDetails = ref<GameEmailAccount | null>(null)
 
-// Estados para editar foto del juego
-const showEditPhoto = ref(false)
-const editingGamePhoto = ref<GameSummary | null>(null)
-const newPhotoUrl = ref('')
-const isUpdatingPhoto = ref(false)
-const photoError = ref('')
-const photoSuccess = ref('')
+// Estados para editar juego
+const showEditGame = ref(false)
+const editingGame = ref<GameSummary | null>(null)
+const editGameName = ref('')
+const editPhotoUrl = ref('')
+const editGameVersion = ref<GamePlatform>('PS4 & PS5')
+const editTipoPromocion = ref<'ninguna' | 'oferta' | 'promocion'>('ninguna')
+const isUpdatingGame = ref(false)
+const editGameError = ref('')
+const editGameSuccess = ref('')
+
+// Estados para crear juego nuevo
+const showCreateGame = ref(false)
+const newGameName = ref('')
+const newGamePhoto = ref('')
+const newGameVersion = ref<GamePlatform>('PS4 & PS5')
+const newGameTipoPromocion = ref<'ninguna' | 'oferta' | 'promocion'>('ninguna')
+const isCreatingGame = ref(false)
+const createGameError = ref('')
+const createGameSuccess = ref('')
 
 
 const juegosFiltrados = computed(() => {
@@ -140,36 +151,184 @@ const formatearPrecio = (precio: number): string => {
   }).format(precio)
 }
 
-const procesarCodigos = (texto: string): string[] => {
-  return texto
-    .split('\n')
-    .map(codigo => codigo.trim())
-    .filter(codigo => codigo.length > 0)
-}
-
-const procesarCuentas = (texto: string): AccountOwner[] => {
-  // Formato esperado: tipo|nombre|telefono (uno por línea)
-  // Ejemplo: Principal PS4|19998 Ps4|+593 99 358 6097
-  return texto
-    .split('\n')
-    .map(linea => linea.trim())
-    .filter(linea => linea.length > 0)
-    .map(linea => {
-      const partes = linea.split('|')
-      if (partes.length >= 3) {
-        return {
-          tipo: partes[0]?.trim() as any,
-          nombre: partes[1]?.trim(),
-          telefono: partes[2]?.trim()
+// Función para parsear archivo .txt
+const parsearArchivoTxt = (contenido: string): void => {
+  try {
+    const lineas = contenido.split('\n').map(l => l.trim()).filter(l => l)
+    
+    // Primera línea es el correo
+    const correo = lineas[0] || ''
+    newEmail.value.correo = correo
+    
+    // Buscar cuentas (líneas que contienen "Principal" o "Secundaria")
+    const cuentas: AccountOwner[] = []
+    lineas.forEach(linea => {
+      if (linea.includes('Principal PS4') || linea.includes('Secundaria PS4') || linea.includes('Principal PS5')) {
+        // Extraer tipo de cuenta
+        let tipo: AccountType = 'Principal PS4'
+        if (linea.includes('Secundaria PS4')) tipo = 'Secundaria PS4'
+        else if (linea.includes('Principal PS5')) tipo = 'Principal PS5'
+        
+        // Extraer teléfono (empieza con +593)
+        const telefonoMatch = linea.match(/\+593\s*\d+\s*\d+\s*\d+\s*\d+/)
+        const telefono = telefonoMatch ? telefonoMatch[0].replace(/\s+/g, ' ') : ''
+        
+        // Extraer nombre (texto entre "la tiene" y el teléfono)
+        const nombreMatch = linea.match(/la tiene\s+(.+?)\s+\+593/)
+        const nombre = nombreMatch && nombreMatch[1] ? nombreMatch[1].trim() : ''
+        
+        if (telefono && nombre) {
+          cuentas.push({ tipo, nombre, telefono })
         }
       }
-      return null
     })
-    .filter(cuenta => cuenta !== null) as AccountOwner[]
+    newEmail.value.cuentas = cuentas
+    
+    // Buscar nombre del juego
+    const nombreIdx = lineas.findIndex(l => l.startsWith('Nombre:'))
+    if (nombreIdx !== -1 && lineas[nombreIdx]) {
+      newEmail.value.nombre = lineas[nombreIdx]!.replace('Nombre:', '').trim()
+    }
+    
+    // Buscar costo
+    const costoIdx = lineas.findIndex(l => l.startsWith('Costo:'))
+    if (costoIdx !== -1 && lineas[costoIdx]) {
+      const costoStr = lineas[costoIdx]!.replace('Costo:', '').replace('$', '').trim()
+      newEmail.value.costo = parseFloat(costoStr) || 0
+    }
+    
+    // Buscar código (después de "MASTER")
+    const masterIdx = lineas.findIndex(l => l === 'MASTER')
+    if (masterIdx !== -1 && masterIdx + 1 < lineas.length && lineas[masterIdx + 1]) {
+      newEmail.value.codigo = lineas[masterIdx + 1]!
+    }
+    
+    // Buscar código master (la línea más larga, típicamente 80+ caracteres)
+    const codigoMaster = lineas.find(l => l.length > 80 && /^[A-Z0-9]+$/.test(l))
+    if (codigoMaster) {
+      newEmail.value.codigoMaster = codigoMaster
+    }
+    
+    // Buscar códigos generados (líneas de 6 caracteres alfanuméricos)
+    const codigos = lineas.filter(l => l.length === 6 && /^[A-Za-z0-9]+$/.test(l))
+    newEmail.value.codigosGenerados = codigos
+    
+    createSuccess.value = 'Archivo cargado exitosamente'
+    setTimeout(() => { createSuccess.value = '' }, 3000)
+  } catch (error) {
+    console.error('Error parseando archivo:', error)
+    createError.value = 'Error al procesar el archivo. Verifica el formato.'
+  }
 }
 
-const cuentasATexto = (cuentas: AccountOwner[]): string => {
-  return cuentas.map(c => `${c.tipo}|${c.nombre}|${c.telefono}`).join('\n')
+const handleFileUpload = (event: Event): void => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  
+  if (!file) return
+  
+  if (!file.name.endsWith('.txt')) {
+    createError.value = 'Por favor selecciona un archivo .txt'
+    return
+  }
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const contenido = e.target?.result as string
+    parsearArchivoTxt(contenido)
+  }
+  reader.readAsText(file)
+  
+  // Limpiar el input para permitir subir el mismo archivo de nuevo
+  input.value = ''
+}
+
+// Estados para drag & drop
+const isDragging = ref(false)
+let dragCounter = 0
+
+const handleDragEnter = (e: DragEvent): void => {
+  e.preventDefault()
+  dragCounter++
+  isDragging.value = true
+}
+
+const handleDragLeave = (e: DragEvent): void => {
+  e.preventDefault()
+  dragCounter--
+  if (dragCounter === 0) {
+    isDragging.value = false
+  }
+}
+
+const handleDragOver = (e: DragEvent): void => {
+  e.preventDefault()
+}
+
+const handleDrop = (e: DragEvent): void => {
+  e.preventDefault()
+  isDragging.value = false
+  dragCounter = 0
+  
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0) return
+  
+  const file = files[0]
+  if (!file) return
+  
+  if (!file.name.endsWith('.txt')) {
+    createError.value = 'Por favor arrastra un archivo .txt'
+    return
+  }
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const contenido = e.target?.result as string
+    parsearArchivoTxt(contenido)
+  }
+  reader.readAsText(file)
+}
+
+// Funciones para manejar códigos
+const agregarCodigo = (isEdit: boolean = false): void => {
+  const nuevoCodigo = prompt('Ingresa el nuevo código:')
+  if (nuevoCodigo && nuevoCodigo.trim()) {
+    if (isEdit) {
+      editEmailData.value.codigosGenerados.push(nuevoCodigo.trim())
+    } else {
+      newEmail.value.codigosGenerados.push(nuevoCodigo.trim())
+    }
+  }
+}
+
+const eliminarCodigo = (index: number, isEdit: boolean = false): void => {
+  if (isEdit) {
+    editEmailData.value.codigosGenerados.splice(index, 1)
+  } else {
+    newEmail.value.codigosGenerados.splice(index, 1)
+  }
+}
+
+// Funciones para manejar cuentas
+const agregarCuenta = (isEdit: boolean = false): void => {
+  const nuevaCuenta: AccountOwner = {
+    tipo: 'Principal PS4',
+    nombre: '',
+    telefono: ''
+  }
+  if (isEdit) {
+    editEmailData.value.cuentas.push(nuevaCuenta)
+  } else {
+    newEmail.value.cuentas.push(nuevaCuenta)
+  }
+}
+
+const eliminarCuenta = (index: number, isEdit: boolean = false): void => {
+  if (isEdit) {
+    editEmailData.value.cuentas.splice(index, 1)
+  } else {
+    newEmail.value.cuentas.splice(index, 1)
+  }
 }
 
 const iniciarCreacion = (): void => {
@@ -186,10 +345,10 @@ const iniciarCreacion = (): void => {
     codigo: juegoSeleccionado.value.id,
     cuentas: []
   }
-  newCodigosTexto.value = ''
-  newCuentasTexto.value = ''
   createError.value = ''
   createSuccess.value = ''
+  isDragging.value = false
+  dragCounter = 0
   showCreateEmail.value = true
 }
 
@@ -204,13 +363,8 @@ const handleCreateEmail = async (): Promise<void> => {
   createSuccess.value = ''
 
   try {
-    const codigos = procesarCodigos(newCodigosTexto.value)
-    const cuentas = procesarCuentas(newCuentasTexto.value)
-
     const emailData = {
       ...newEmail.value,
-      codigosGenerados: codigos,
-      cuentas,
       createdBy: currentUserData.value?.uid
     }
 
@@ -246,10 +400,8 @@ const iniciarEdicion = (email: GameEmailAccount): void => {
     codigosGenerados: [...email.codigosGenerados],
     fecha: email.fecha,
     codigo: email.codigo,
-    cuentas: [...email.cuentas]
+    cuentas: JSON.parse(JSON.stringify(email.cuentas)) // Deep copy
   }
-  editCodigosTexto.value = email.codigosGenerados.join('\n')
-  editCuentasTexto.value = cuentasATexto(email.cuentas)
   editError.value = ''
   editSuccess.value = ''
   showEditEmail.value = true
@@ -263,9 +415,6 @@ const handleEditEmail = async (): Promise<void> => {
   editSuccess.value = ''
 
   try {
-    const codigos = procesarCodigos(editCodigosTexto.value)
-    const cuentas = procesarCuentas(editCuentasTexto.value)
-
     await actualizarCorreoJuego(
       plataformaSeleccionada.value,
       juegoSeleccionado.value.id,
@@ -274,9 +423,9 @@ const handleEditEmail = async (): Promise<void> => {
         nombre: editEmailData.value.nombre,
         costo: editEmailData.value.costo,
         codigoMaster: editEmailData.value.codigoMaster,
-        codigosGenerados: codigos,
+        codigosGenerados: editEmailData.value.codigosGenerados,
         codigo: editEmailData.value.codigo,
-        cuentas
+        cuentas: editEmailData.value.cuentas
       }
     )
 
@@ -363,59 +512,137 @@ const cerrarDetalles = (): void => {
   selectedEmailDetails.value = null
 }
 
-const iniciarEdicionFoto = (juego: GameSummary): void => {
-  editingGamePhoto.value = juego
-  newPhotoUrl.value = juego.foto || ''
-  photoError.value = ''
-  photoSuccess.value = ''
-  showEditPhoto.value = true
+const iniciarCreacionJuego = (): void => {
+  newGameName.value = ''
+  newGamePhoto.value = ''
+  newGameVersion.value = plataformaSeleccionada.value
+  newGameTipoPromocion.value = 'ninguna'
+  createGameError.value = ''
+  createGameSuccess.value = ''
+  showCreateGame.value = true
 }
 
-const handleUpdatePhoto = async (): Promise<void> => {
-  if (!editingGamePhoto.value) return
-
-  if (!newPhotoUrl.value.trim()) {
-    photoError.value = 'Por favor ingresa una URL válida'
+const handleCreateGame = async (): Promise<void> => {
+  if (!newGameName.value.trim()) {
+    createGameError.value = 'Por favor ingresa el nombre del juego'
     return
   }
 
-  isUpdatingPhoto.value = true
-  photoError.value = ''
-  photoSuccess.value = ''
+  isCreatingGame.value = true
+  createGameError.value = ''
+  createGameSuccess.value = ''
 
   try {
-    await actualizarFotoJuego(
+    const juegoId = await crearJuego(
       plataformaSeleccionada.value,
-      editingGamePhoto.value.id,
-      newPhotoUrl.value.trim()
+      newGameName.value.trim(),
+      newGamePhoto.value.trim() || undefined,
+      newGameTipoPromocion.value === 'oferta', // Legacy support
+      newGameVersion.value // Versión del juego
+    )
+    
+    // Actualizar con el nuevo campo de tipo de promoción
+    await actualizarJuego(
+      plataformaSeleccionada.value,
+      juegoId,
+      {
+        tipoPromocion: newGameTipoPromocion.value,
+        version: newGameVersion.value
+      }
     )
 
-    photoSuccess.value = 'Foto actualizada exitosamente'
-    
-    // Actualizar en la lista local
-    const juegoIndex = games.value.findIndex(j => j.id === editingGamePhoto.value?.id)
-    if (juegoIndex !== -1) {
-      games.value[juegoIndex]!.foto = newPhotoUrl.value.trim()
-    }
+    createGameSuccess.value = 'Juego creado exitosamente'
+    await cargarJuegosPorPlataforma()
 
     setTimeout(() => {
-      showEditPhoto.value = false
-      photoSuccess.value = ''
-      editingGamePhoto.value = null
+      showCreateGame.value = false
+      createGameSuccess.value = ''
     }, 1500)
-  } catch (error) {
-    console.error('Error actualizando foto:', error)
-    photoError.value = 'Error al actualizar la foto'
+  } catch (error: any) {
+    console.error('Error creando juego:', error)
+    createGameError.value = error.message || 'Error al crear el juego'
   } finally {
-    isUpdatingPhoto.value = false
+    isCreatingGame.value = false
   }
 }
 
-const cerrarEditarFoto = (): void => {
-  showEditPhoto.value = false
-  editingGamePhoto.value = null
-  newPhotoUrl.value = ''
-  photoError.value = ''
+const cerrarCrearJuego = (): void => {
+  showCreateGame.value = false
+  newGameName.value = ''
+  newGamePhoto.value = ''
+  newGameVersion.value = 'PS4 & PS5'
+  newGameTipoPromocion.value = 'ninguna'
+  createGameError.value = ''
+}
+
+const iniciarEdicionJuego = (juego: GameSummary): void => {
+  editingGame.value = juego
+  editGameName.value = juego.nombre
+  editPhotoUrl.value = juego.foto || ''
+  editGameVersion.value = juego.version
+  editTipoPromocion.value = juego.tipoPromocion || 'ninguna'
+  editGameError.value = ''
+  editGameSuccess.value = ''
+  showEditGame.value = true
+}
+
+const handleUpdateGame = async (): Promise<void> => {
+  if (!editingGame.value) return
+  
+  if (!editGameName.value.trim()) {
+    editGameError.value = 'Por favor ingresa el nombre del juego'
+    return
+  }
+
+  isUpdatingGame.value = true
+  editGameError.value = ''
+  editGameSuccess.value = ''
+
+  try {
+    await actualizarJuego(
+      plataformaSeleccionada.value,
+      editingGame.value.id,
+      {
+        nombre: editGameName.value.trim(),
+        foto: editPhotoUrl.value.trim() || undefined,
+        version: editGameVersion.value,
+        tipoPromocion: editTipoPromocion.value
+      }
+    )
+
+    editGameSuccess.value = 'Juego actualizado exitosamente'
+    
+    // Actualizar en la lista local
+    const juegoIndex = games.value.findIndex(j => j.id === editingGame.value?.id)
+    if (juegoIndex !== -1) {
+      games.value[juegoIndex]!.nombre = editGameName.value.trim()
+      games.value[juegoIndex]!.foto = editPhotoUrl.value.trim()
+      games.value[juegoIndex]!.version = editGameVersion.value
+      games.value[juegoIndex]!.tipoPromocion = editTipoPromocion.value
+      games.value[juegoIndex]!.isOffert = editTipoPromocion.value === 'oferta'
+    }
+
+    setTimeout(() => {
+      showEditGame.value = false
+      editGameSuccess.value = ''
+      editingGame.value = null
+    }, 1500)
+  } catch (error) {
+    console.error('Error actualizando juego:', error)
+    editGameError.value = 'Error al actualizar el juego'
+  } finally {
+    isUpdatingGame.value = false
+  }
+}
+
+const cerrarEditarJuego = (): void => {
+  showEditGame.value = false
+  editingGame.value = null
+  editGameName.value = ''
+  editPhotoUrl.value = ''
+  editGameVersion.value = 'PS4 & PS5'
+  editTipoPromocion.value = 'ninguna'
+  editGameError.value = ''
 }
 
 
@@ -425,15 +652,42 @@ const handleLogout = async (): Promise<void> => {
 }
 
 const volverAlPanel = (): void => {
-  if (isAdmin.value) {
+  if (currentUserData.value?.role === 'admin') {
     router.push('/admin')
-  } else {
+  } else if (currentUserData.value?.role === 'employee') {
     router.push('/employee')
+  } else {
+    router.push('/')
   }
 }
 
-onMounted(() => {
-  cargarJuegosPorPlataforma()
+onMounted(async () => {
+  await loadUserData()
+  
+  // Verificar si hay un juego para abrir desde el state del router
+  const openGame = window.history.state?.openGame as GameSummary | undefined
+  
+  if (openGame) {
+    // Si viene un juego desde el dashboard, siempre cargar desde PS4 & PS5
+    plataformaSeleccionada.value = 'PS4 & PS5'
+    
+    // Cargar todos los juegos
+    await cargarJuegos('PS4 & PS5')
+    
+    // Buscar el juego en la lista cargada (por si el estado tiene datos desactualizados)
+    const juegoActualizado = games.value.find(g => g.id === openGame.id)
+    
+    if (juegoActualizado) {
+      // Mostrar directamente los correos de ese juego
+      await verCorreosJuego(juegoActualizado)
+    } else {
+      // Si no se encuentra, intentar con el juego del state original
+      await verCorreosJuego(openGame)
+    }
+  } else {
+    // Navegación normal, cargar la plataforma por defecto
+    cargarJuegosPorPlataforma()
+  }
 })
 </script>
 
@@ -483,8 +737,6 @@ onMounted(() => {
             <option value="PS4 & PS5">PS4 & PS5</option>
             <option value="PS4">PS4</option>
             <option value="PS5">PS5</option>
-            <option value="Xbox">Xbox</option>
-            <option value="Nintendo Switch">Nintendo Switch</option>
           </select>
 
           <input
@@ -496,22 +748,31 @@ onMounted(() => {
           />
         </div>
 
-        <button 
-          v-if="isAdmin && vistaActual === 'correos'" 
-          class="btn btn-primary"
-          @click="iniciarCreacion"
-        >
-          + Agregar Correo
-        </button>
+        <div v-if="isAdmin" class="flex gap-2">
+          <button 
+            v-if="vistaActual === 'juegos'" 
+            class="btn btn-primary"
+            @click="iniciarCreacionJuego"
+          >
+            + Crear Juego
+          </button>
+          <button 
+            v-if="vistaActual === 'correos'" 
+            class="btn btn-primary"
+            @click="iniciarCreacion"
+          >
+            + Agregar Correo
+          </button>
+        </div>
       </div>
 
       <!-- Mensajes -->
-      <div v-if="createSuccess || editSuccess || deleteSuccess || photoSuccess" class="alert alert-success mb-4">
-        <span>{{ createSuccess || editSuccess || deleteSuccess || photoSuccess }}</span>
+      <div v-if="createSuccess || editSuccess || deleteSuccess || editGameSuccess || createGameSuccess" class="alert alert-success mb-4">
+        <span>{{ createSuccess || editSuccess || deleteSuccess || editGameSuccess || createGameSuccess }}</span>
       </div>
 
-      <div v-if="deleteError || photoError" class="alert alert-error mb-4">
-        <span>{{ deleteError || photoError }}</span>
+      <div v-if="deleteError || editGameError || createGameError" class="alert alert-error mb-4">
+        <span>{{ deleteError || editGameError || createGameError }}</span>
       </div>
 
       <!-- Vista de Juegos -->
@@ -585,10 +846,11 @@ onMounted(() => {
                       <button
                         v-if="isAdmin"
                         class="btn btn-sm btn-warning"
-                        @click="iniciarEdicionFoto(juego)"
+                        @click="iniciarEdicionJuego(juego)"
+                        title="Editar juego"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
                       <button
@@ -697,6 +959,43 @@ onMounted(() => {
       <div class="modal-box max-w-4xl">
         <h3 class="font-bold text-lg mb-4">Agregar Correo a {{ juegoSeleccionado?.nombre }}</h3>
 
+        <!-- Área de drag & drop para subir archivo .txt -->
+        <div 
+          class="border-2 border-dashed rounded-lg p-6 mb-4 transition-all"
+          :class="isDragging ? 'border-primary bg-primary bg-opacity-10' : 'border-base-300'"
+          @dragenter="handleDragEnter"
+          @dragleave="handleDragLeave"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+        >
+          <div class="flex flex-col items-center justify-center text-center">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              class="h-12 w-12 mb-3 transition-colors"
+              :class="isDragging ? 'text-primary' : 'text-base-content opacity-50'"
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p class="text-base font-medium mb-2" :class="isDragging ? 'text-primary' : ''">
+              {{ isDragging ? '¡Suelta el archivo aquí!' : 'Arrastra y suelta tu archivo .txt aquí' }}
+            </p>
+            <p class="text-sm text-base-content opacity-60 mb-4">o</p>
+            <label class="btn btn-sm btn-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Seleccionar archivo
+              <input type="file" accept=".txt" class="hidden" @change="handleFileUpload" />
+            </label>
+            <p class="text-xs text-base-content opacity-50 mt-3">
+              El archivo se leerá automáticamente y llenará todos los campos
+            </p>
+          </div>
+        </div>
+
         <form @submit.prevent="handleCreateEmail" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="form-control md:col-span-2">
@@ -749,29 +1048,59 @@ onMounted(() => {
             ></textarea>
           </div>
 
+          <!-- Códigos Generados -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Códigos Generados (uno por línea)</span>
-            </label>
-            <textarea
-              v-model="newCodigosTexto"
-              class="textarea textarea-bordered h-32"
-              placeholder="wGQHtn&#10;MyEj7B&#10;RMe3kn"
-            ></textarea>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Códigos Generados ({{ newEmail.codigosGenerados.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCodigo(false)">
+                + Agregar Código
+              </button>
+            </div>
+            <div v-if="newEmail.codigosGenerados.length > 0" class="space-y-2 max-h-40 overflow-y-auto border border-base-300 rounded p-2">
+              <div v-for="(codigo, index) in newEmail.codigosGenerados" :key="index" class="flex items-center gap-2 bg-base-200 p-2 rounded">
+                <span class="flex-1 font-mono text-sm">{{ codigo }}</span>
+                <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCodigo(index, false)">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay códigos agregados
+            </div>
           </div>
 
+          <!-- Cuentas -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Cuentas (formato: tipo|nombre|teléfono)</span>
-            </label>
-            <textarea
-              v-model="newCuentasTexto"
-              class="textarea textarea-bordered h-32"
-              placeholder="Principal PS4|19998 Ps4|+593 99 358 6097&#10;Secundaria PS4|Frank Fc PS4|+593 98 777 1379"
-            ></textarea>
-            <label class="label">
-              <span class="label-text-alt">Formato: tipo|nombre|teléfono (uno por línea)</span>
-            </label>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Cuentas ({{ newEmail.cuentas.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCuenta(false)">
+                + Agregar Cuenta
+              </button>
+            </div>
+            <div v-if="newEmail.cuentas.length > 0" class="space-y-3 max-h-60 overflow-y-auto border border-base-300 rounded p-3">
+              <div v-for="(cuenta, index) in newEmail.cuentas" :key="index" class="bg-base-200 p-3 rounded space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-sm">Cuenta {{ index + 1 }}</span>
+                  <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCuenta(index, false)">
+                    ✕
+                  </button>
+                </div>
+                <select v-model="cuenta.tipo" class="select select-bordered select-sm w-full">
+                  <option value="Principal PS4">Principal PS4</option>
+                  <option value="Secundaria PS4">Secundaria PS4</option>
+                  <option value="Principal PS5">Principal PS5</option>
+                </select>
+                <input v-model="cuenta.nombre" type="text" placeholder="Nombre" class="input input-bordered input-sm w-full" />
+                <input v-model="cuenta.telefono" type="text" placeholder="Teléfono" class="input input-bordered input-sm w-full" />
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay cuentas agregadas
+            </div>
           </div>
 
           <div v-if="createError" class="alert alert-error">
@@ -853,27 +1182,59 @@ onMounted(() => {
             ></textarea>
           </div>
 
+          <!-- Códigos Generados -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Códigos Generados (uno por línea)</span>
-            </label>
-            <textarea
-              v-model="editCodigosTexto"
-              class="textarea textarea-bordered h-32"
-            ></textarea>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Códigos Generados ({{ editEmailData.codigosGenerados.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCodigo(true)">
+                + Agregar Código
+              </button>
+            </div>
+            <div v-if="editEmailData.codigosGenerados.length > 0" class="space-y-2 max-h-40 overflow-y-auto border border-base-300 rounded p-2">
+              <div v-for="(codigo, index) in editEmailData.codigosGenerados" :key="index" class="flex items-center gap-2 bg-base-200 p-2 rounded">
+                <span class="flex-1 font-mono text-sm">{{ codigo }}</span>
+                <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCodigo(index, true)">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay códigos agregados
+            </div>
           </div>
 
+          <!-- Cuentas -->
           <div class="form-control">
-            <label class="label">
-              <span class="label-text">Cuentas (formato: tipo|nombre|teléfono)</span>
-            </label>
-            <textarea
-              v-model="editCuentasTexto"
-              class="textarea textarea-bordered h-32"
-            ></textarea>
-            <label class="label">
-              <span class="label-text-alt">Formato: tipo|nombre|teléfono (uno por línea)</span>
-            </label>
+            <div class="flex justify-between items-center mb-2">
+              <label class="label">
+                <span class="label-text">Cuentas ({{ editEmailData.cuentas.length }})</span>
+              </label>
+              <button type="button" class="btn btn-xs btn-primary" @click="agregarCuenta(true)">
+                + Agregar Cuenta
+              </button>
+            </div>
+            <div v-if="editEmailData.cuentas.length > 0" class="space-y-3 max-h-60 overflow-y-auto border border-base-300 rounded p-3">
+              <div v-for="(cuenta, index) in editEmailData.cuentas" :key="index" class="bg-base-200 p-3 rounded space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-sm">Cuenta {{ index + 1 }}</span>
+                  <button type="button" class="btn btn-xs btn-error btn-circle" @click="eliminarCuenta(index, true)">
+                    ✕
+                  </button>
+                </div>
+                <select v-model="cuenta.tipo" class="select select-bordered select-sm w-full">
+                  <option value="Principal PS4">Principal PS4</option>
+                  <option value="Secundaria PS4">Secundaria PS4</option>
+                  <option value="Principal PS5">Principal PS5</option>
+                </select>
+                <input v-model="cuenta.nombre" type="text" placeholder="Nombre" class="input input-bordered input-sm w-full" />
+                <input v-model="cuenta.telefono" type="text" placeholder="Teléfono" class="input input-bordered input-sm w-full" />
+              </div>
+            </div>
+            <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
+              No hay cuentas agregadas
+            </div>
           </div>
 
           <div v-if="editError" class="alert alert-error">
@@ -965,90 +1326,435 @@ onMounted(() => {
       </form>
     </dialog>
 
-    <!-- Modal para editar foto del juego -->
-    <dialog :class="['modal', { 'modal-open': showEditPhoto }]">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Editar Foto del Juego</h3>
-
-        <form @submit.prevent="handleUpdatePhoto" class="space-y-4">
-          <div v-if="editingGamePhoto" class="alert alert-info">
-            <span>Editando foto de: {{ editingGamePhoto.nombre }}</span>
+    <!-- Modal para crear juego nuevo -->
+    <dialog :class="['modal', { 'modal-open': showCreateGame }]">
+      <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-2xl mb-6 flex items-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Crear Nuevo Juego
+        </h3>
+        
+        <form @submit.prevent="handleCreateGame" class="space-y-6">
+          <!-- Nombre del Juego -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Nombre del Juego *
+              </span>
+            </label>
+            <input
+              v-model="newGameName"
+              type="text"
+              placeholder="Ej: God of War Ragnarök"
+              class="input input-bordered input-lg"
+              required
+            />
+            <label class="label">
+              <span class="label-text-alt">Este nombre será visible para los clientes</span>
+            </label>
           </div>
 
-          <!-- Preview de la foto actual -->
-          <div v-if="editingGamePhoto?.foto" class="form-control">
+          <!-- Versión/Categoría del Juego -->
+          <div class="form-control">
             <label class="label">
-              <span class="label-text">Foto Actual</span>
+              <span class="label-text font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+                Versión/Categoría *
+              </span>
             </label>
-            <div class="avatar">
-              <div class="w-32 rounded">
-                <img :src="editingGamePhoto.foto" :alt="editingGamePhoto.nombre" />
-              </div>
-            </div>
+            <select v-model="newGameVersion" class="select select-bordered select-lg">
+              <option value="PS4 & PS5">PS4 & PS5</option>
+              <option value="PS4">PS4</option>
+              <option value="PS5">PS5</option>
+            </select>
+            <label class="label">
+              <span class="label-text-alt">Selecciona: PS4, PS5 o PS4 & PS5 (ambas)</span>
+            </label>
+          </div>
+
+          <!-- Sección de Imagen -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Imagen del Juego
+            </span>
           </div>
 
           <div class="form-control">
             <label class="label">
-              <span class="label-text">URL de la Foto *</span>
+              <span class="label-text font-medium">URL de la Foto</span>
+              <span class="label-text-alt text-xs opacity-60">Opcional</span>
             </label>
             <input
-              v-model="newPhotoUrl"
+              v-model="newGamePhoto"
               type="url"
               placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
               class="input input-bordered"
-              required
             />
-            <label class="label">
-              <span class="label-text-alt">Ingresa la URL completa de la imagen</span>
-            </label>
           </div>
 
           <!-- Preview de la nueva foto -->
-          <div v-if="newPhotoUrl" class="form-control">
+          <div v-if="newGamePhoto" class="form-control">
             <label class="label">
-              <span class="label-text">Vista Previa</span>
+              <span class="label-text font-medium">Vista Previa</span>
             </label>
-            <div class="avatar">
-              <div class="w-32 rounded">
-                <img 
-                  :src="newPhotoUrl" 
-                  alt="Preview"
-                  @error="(e) => (e.target as HTMLImageElement).src = ''"
-                />
+            <div class="flex justify-center bg-base-200 rounded-lg p-4">
+              <div class="avatar">
+                <div class="w-48 rounded-lg shadow-lg">
+                  <img 
+                    :src="newGamePhoto" 
+                    alt="Preview"
+                    class="object-cover"
+                    @error="(e) => (e.target as HTMLImageElement).src = ''"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div v-if="photoError" class="alert alert-error">
-            <span>{{ photoError }}</span>
+          <!-- Tipo de Promoción -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Tipo de Promoción
+            </span>
           </div>
 
-          <div v-if="photoSuccess" class="alert alert-success">
-            <span>{{ photoSuccess }}</span>
+          <div class="form-control bg-base-200 rounded-lg p-4">
+            <div class="grid grid-cols-3 gap-3">
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="newGameTipoPromocion === 'ninguna' ? 'border-primary bg-primary/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="newGamePromocion" 
+                    value="ninguna" 
+                    v-model="newGameTipoPromocion" 
+                    class="radio radio-primary" 
+                  />
+                  <span class="font-medium text-sm">Ninguna</span>
+                  <span class="text-xs opacity-60">Sin promoción</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="newGameTipoPromocion === 'oferta' ? 'border-success bg-success/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="newGamePromocion" 
+                    value="oferta" 
+                    v-model="newGameTipoPromocion" 
+                    class="radio radio-success" 
+                  />
+                  <span class="font-medium text-sm">Oferta</span>
+                  <span class="text-xs opacity-60">Precio especial</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="newGameTipoPromocion === 'promocion' ? 'border-warning bg-warning/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="newGamePromocion" 
+                    value="promocion" 
+                    v-model="newGameTipoPromocion" 
+                    class="radio radio-warning" 
+                  />
+                  <span class="font-medium text-sm">Promoción</span>
+                  <span class="text-xs opacity-60">Destacado</span>
+                </div>
+              </label>
+            </div>
           </div>
 
+          <!-- Mensaje de error -->
+          <div v-if="createGameError" class="alert alert-error shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ createGameError }}</span>
+          </div>
+
+          <!-- Botones de acción -->
           <div class="modal-action">
             <button
               type="button"
-              class="btn"
-              @click="cerrarEditarFoto"
-              :disabled="isUpdatingPhoto"
+              class="btn btn-ghost"
+              @click="cerrarCrearJuego"
+              :disabled="isCreatingGame"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
               Cancelar
             </button>
             <button
               type="submit"
-              class="btn btn-primary"
-              :disabled="isUpdatingPhoto"
+              class="btn btn-primary btn-lg"
+              :disabled="isCreatingGame"
             >
-              <span v-if="isUpdatingPhoto" class="loading loading-spinner"></span>
-              {{ isUpdatingPhoto ? 'Guardando...' : 'Guardar Foto' }}
+              <span v-if="isCreatingGame" class="loading loading-spinner"></span>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              {{ isCreatingGame ? 'Creando...' : 'Crear Juego' }}
             </button>
           </div>
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button @click="cerrarEditarFoto">close</button>
+        <button @click="cerrarCrearJuego">close</button>
+      </form>
+    </dialog>
+
+    <!-- Modal para editar juego -->
+    <dialog :class="['modal', { 'modal-open': showEditGame }]">
+      <div class="modal-box max-w-3xl">
+        <h3 class="font-bold text-2xl mb-6">Editar Juego</h3>
+
+        <form @submit.prevent="handleUpdateGame" class="space-y-6">
+          <!-- Info del juego que se está editando -->
+          <div v-if="editingGame" class="bg-base-200 rounded-lg p-4">
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <span class="text-sm opacity-70">ID del juego:</span>
+                <span class="font-mono ml-2 font-semibold">{{ editingGame.id }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nombre del Juego -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Nombre del Juego *
+              </span>
+            </label>
+            <input
+              v-model="editGameName"
+              type="text"
+              placeholder="Ej: God of War Ragnarök"
+              class="input input-bordered input-lg"
+              required
+            />
+          </div>
+
+          <!-- Versión/Categoría del Juego -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+                Versión/Categoría *
+              </span>
+            </label>
+            <select v-model="editGameVersion" class="select select-bordered select-lg">
+              <option value="PS4 & PS5">PS4 & PS5</option>
+              <option value="PS4">PS4</option>
+              <option value="PS5">PS5</option>
+            </select>
+            <label class="label">
+              <span class="label-text-alt">Selecciona: PS4, PS5 o PS4 & PS5 (ambas)</span>
+            </label>
+          </div>
+
+          <!-- Sección de Imágenes -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Imagen del Juego
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Foto Actual -->
+            <div v-if="editingGame?.foto" class="form-control">
+              <label class="label">
+                <span class="label-text font-medium">Foto Actual</span>
+              </label>
+              <div class="flex justify-center bg-base-200 rounded-lg p-4">
+                <div class="avatar">
+                  <div class="w-48 rounded-lg shadow-lg">
+                    <img :src="editingGame.foto" :alt="editingGame.nombre" class="object-cover" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview de Nueva Foto -->
+            <div v-if="editPhotoUrl && editPhotoUrl !== editingGame?.foto" class="form-control">
+              <label class="label">
+                <span class="label-text font-medium flex items-center gap-2">
+                  <span class="badge badge-success badge-sm">Nueva</span>
+                  Vista Previa
+                </span>
+              </label>
+              <div class="flex justify-center bg-base-200 rounded-lg p-4">
+                <div class="avatar">
+                  <div class="w-48 rounded-lg shadow-lg">
+                    <img 
+                      :src="editPhotoUrl" 
+                      alt="Preview"
+                      class="object-cover"
+                      @error="(e) => (e.target as HTMLImageElement).src = ''"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- URL de la Foto -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-medium">URL de la Foto</span>
+              <span class="label-text-alt text-xs opacity-60">Opcional</span>
+            </label>
+            <input
+              v-model="editPhotoUrl"
+              type="url"
+              placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
+              class="input input-bordered"
+            />
+          </div>
+
+          <!-- Tipo de Promoción -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Tipo de Promoción
+            </span>
+          </div>
+
+          <div class="form-control bg-base-200 rounded-lg p-4">
+            <div class="grid grid-cols-3 gap-3">
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="editTipoPromocion === 'ninguna' ? 'border-primary bg-primary/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="editPromocion" 
+                    value="ninguna" 
+                    v-model="editTipoPromocion" 
+                    class="radio radio-primary" 
+                  />
+                  <span class="font-medium text-sm">Ninguna</span>
+                  <span class="text-xs opacity-60">Sin promoción</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="editTipoPromocion === 'oferta' ? 'border-success bg-success/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="editPromocion" 
+                    value="oferta" 
+                    v-model="editTipoPromocion" 
+                    class="radio radio-success" 
+                  />
+                  <span class="font-medium text-sm">Oferta</span>
+                  <span class="text-xs opacity-60">Precio especial</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="editTipoPromocion === 'promocion' ? 'border-warning bg-warning/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="editPromocion" 
+                    value="promocion" 
+                    v-model="editTipoPromocion" 
+                    class="radio radio-warning" 
+                  />
+                  <span class="font-medium text-sm">Promoción</span>
+                  <span class="text-xs opacity-60">Destacado</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Mensajes de error/éxito -->
+          <div v-if="editGameError" class="alert alert-error shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ editGameError }}</span>
+          </div>
+
+          <div v-if="editGameSuccess" class="alert alert-success shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ editGameSuccess }}</span>
+          </div>
+
+          <!-- Botones de acción -->
+          <div class="modal-action">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              @click="cerrarEditarJuego"
+              :disabled="isUpdatingGame"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary btn-lg"
+              :disabled="isUpdatingGame"
+            >
+              <span v-if="isUpdatingGame" class="loading loading-spinner"></span>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ isUpdatingGame ? 'Guardando...' : 'Guardar Cambios' }}
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button @click="cerrarEditarJuego">close</button>
       </form>
     </dialog>
 

@@ -33,32 +33,50 @@ export function useGames() {
         const juegoDocData = juegoDoc.data()
         
         // Obtener todos los correos dentro de este juego
-        const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
-        const correosSnapshot = await getDocs(correosRef)
+      const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
+      const correosSnapshot = await getDocs(correosRef)
 
-        if (correosSnapshot.empty) continue
+      const correos: string[] = []
+      let juegoData: any = null
 
-        const correos: string[] = []
-        let juegoData: any = null
-
-        correosSnapshot.docs.forEach((correoDoc) => {
-          correos.push(correoDoc.id)
-          if (!juegoData) {
-            juegoData = correoDoc.data()
-          }
-        })
-
-        if (juegoData) {
-          juegosMap.set(juegoId, {
-            id: juegoId,
-            nombre: juegoData.nombre || juegoId,
-            costo: juegoData.costo || 0,
-            version: juegoData.version || plataforma,
-            foto: juegoDocData.foto || '', // Foto del documento principal
-            totalCorreos: correos.length,
-            correos
-          })
+      correosSnapshot.docs.forEach((correoDoc) => {
+        correos.push(correoDoc.id)
+        if (!juegoData) {
+          juegoData = correoDoc.data()
         }
+      })
+
+      // Convertir ID del juego a nombre legible (ej: a_way_out -> A Way Out)
+      const nombreFromId = juegoId
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+
+      // Determinar tipo de promoción (migrar de isOffert si existe)
+      let tipoPromocion: 'ninguna' | 'oferta' | 'promocion' = 'ninguna'
+      if (juegoDocData.tipoPromocion) {
+        tipoPromocion = juegoDocData.tipoPromocion
+      } else if (juegoDocData.isOffert === true) {
+        tipoPromocion = 'oferta' // Migración automática
+      }
+
+      // Usar el costo del documento principal si existe, sino del primer correo
+      const costoJuego = juegoDocData.costo !== undefined ? juegoDocData.costo : (juegoData?.costo || 0)
+      
+      // Usar la version del documento principal si existe, sino usar la plataforma actual o del primer correo
+      const versionJuego = juegoDocData.version || juegoData?.version || plataforma
+
+      juegosMap.set(juegoId, {
+        id: juegoId,
+        nombre: juegoDocData.nombre || juegoData?.nombre || nombreFromId,
+        costo: costoJuego, // Precio del documento principal (último correo subido)
+        version: versionJuego, // Categoría del juego (PS4, PS5, PS4 & PS5, etc.)
+        foto: juegoDocData.foto || '', // Foto del documento principal
+        isOffert: juegoDocData.isOffert || false, // Legacy
+        tipoPromocion, // Nuevo campo de tipo de promoción
+        totalCorreos: correos.length,
+        correos
+      })
       }
 
       games.value = Array.from(juegosMap.values()).sort((a, b) => 
@@ -145,6 +163,7 @@ export function useGames() {
   ): Promise<void> => {
     try {
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
 
       const correoData = {
         nombre: datosCorreo.nombre,
@@ -160,7 +179,15 @@ export function useGames() {
         createdBy: datosCorreo.createdBy
       }
 
+      // Crear el correo
       await setDoc(correoRef, correoData)
+
+      // Actualizar el precio del juego en el documento principal
+      // El último correo subido actualiza el precio del juego
+      await setDoc(juegoRef, {
+        costo: datosCorreo.costo,
+        ultimaActualizacionPrecio: Timestamp.now()
+      }, { merge: true })
     } catch (error) {
       console.error('Error creando correo:', error)
       throw error
@@ -175,6 +202,7 @@ export function useGames() {
   ): Promise<void> => {
     try {
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
 
       const datosActualizados: Record<string, any> = {
         ...datos,
@@ -186,6 +214,14 @@ export function useGames() {
       }
 
       await updateDoc(correoRef, datosActualizados)
+
+      // Si se actualiza el costo, también actualizar el precio del juego
+      if (datos.costo !== undefined) {
+        await setDoc(juegoRef, {
+          costo: datos.costo,
+          ultimaActualizacionPrecio: Timestamp.now()
+        }, { merge: true })
+      }
     } catch (error) {
       console.error('Error actualizando correo:', error)
       throw error
@@ -227,24 +263,12 @@ export function useGames() {
     }
   }
 
-  const actualizarFotoJuego = async (
-    plataforma: GamePlatform,
-    juegoId: string,
-    fotoUrl: string
-  ): Promise<void> => {
-    try {
-      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
-      await setDoc(juegoRef, { foto: fotoUrl }, { merge: true })
-    } catch (error) {
-      console.error('Error actualizando foto:', error)
-      throw error
-    }
-  }
-
   const crearJuego = async (
     plataforma: GamePlatform,
     nombre: string,
-    foto?: string
+    foto?: string,
+    isOffert?: boolean,
+    version?: GamePlatform
   ): Promise<string> => {
     try {
       const juegoId = generarIdJuego(nombre)
@@ -255,17 +279,67 @@ export function useGames() {
       if (juegoDoc.exists()) {
         throw new Error(`El juego "${nombre}" ya existe en esta plataforma`)
       }
-
-      // Crear el documento del juego (puede estar vacío o tener foto)
-      const juegoData: Record<string, any> = {}
-      if (foto && foto.trim()) {
-        juegoData.foto = foto.trim()
+      
+      // Siempre crear el documento con al menos estos campos para asegurar que se cree en Firestore
+      const juegoData: Record<string, any> = {
+        createdAt: new Date(),
+        nombre: nombre,
+        version: version || plataforma // Si no se especifica, usar la plataforma
       }
-
+      
+      if (foto && foto.trim()) juegoData.foto = foto.trim()
+      if (isOffert !== undefined) juegoData.isOffert = isOffert
+      
       await setDoc(juegoRef, juegoData)
       return juegoId
     } catch (error) {
       console.error('Error creando juego:', error)
+      throw error
+    }
+  }
+
+  const actualizarJuego = async (
+    plataforma: GamePlatform,
+    juegoId: string,
+    datos: {
+      nombre?: string
+      foto?: string
+      version?: GamePlatform
+      isOffert?: boolean
+      tipoPromocion?: 'ninguna' | 'oferta' | 'promocion'
+    }
+  ): Promise<void> => {
+    try {
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
+      const updateData: Record<string, any> = {}
+      
+      if (datos.nombre !== undefined) updateData.nombre = datos.nombre
+      if (datos.foto !== undefined) updateData.foto = datos.foto
+      if (datos.version !== undefined) updateData.version = datos.version
+      if (datos.tipoPromocion !== undefined) {
+        updateData.tipoPromocion = datos.tipoPromocion
+        // Actualizar también isOffert para compatibilidad
+        updateData.isOffert = datos.tipoPromocion === 'oferta'
+      }
+      if (datos.isOffert !== undefined) updateData.isOffert = datos.isOffert
+      
+      await setDoc(juegoRef, updateData, { merge: true })
+    } catch (error) {
+      console.error('Error actualizando juego:', error)
+      throw error
+    }
+  }
+
+  const actualizarFotoJuego = async (
+    plataforma: GamePlatform,
+    juegoId: string,
+    fotoUrl: string
+  ): Promise<void> => {
+    try {
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
+      await setDoc(juegoRef, { foto: fotoUrl }, { merge: true })
+    } catch (error) {
+      console.error('Error actualizando foto:', error)
       throw error
     }
   }
@@ -306,12 +380,13 @@ export function useGames() {
     cargarJuegos,
     cargarCorreosJuego,
     cargarCorreoPorId,
+    crearJuego,
+    actualizarJuego,
     crearCorreoJuego,
     actualizarCorreoJuego,
     eliminarCorreoJuego,
     eliminarJuegoCompleto,
     actualizarFotoJuego,
-    crearJuego,
     buscarJuegos,
     filtrarJuegosPorPrecio,
     generarIdJuego

@@ -8,6 +8,7 @@ import LoginView from '@/views/auth/LoginView.vue'
 import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 import EmployeeDashboard from '@/views/employee/EmployeeDashboard.vue'
 import GamesManager from '@/views/admin/GamesManager.vue'
+import NotFoundView from '@/views/NotFoundView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -41,6 +42,12 @@ const router = createRouter({
       name: 'games',
       component: GamesManager,
       meta: { requiresAuth: true, requiresRole: 'employee' },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: NotFoundView,
+      meta: { requiresAuth: false },
     },
   ],
 })
