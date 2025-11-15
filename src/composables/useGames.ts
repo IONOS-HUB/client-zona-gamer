@@ -60,10 +60,13 @@ export function useGames() {
         tipoPromocion = 'oferta' // Migración automática
       }
 
+      // Usar el costo del documento principal si existe, sino del primer correo
+      const costoJuego = juegoDocData.costo !== undefined ? juegoDocData.costo : (juegoData?.costo || 0)
+
       juegosMap.set(juegoId, {
         id: juegoId,
         nombre: juegoDocData.nombre || juegoData?.nombre || nombreFromId,
-        costo: juegoData?.costo || 0,
+        costo: costoJuego, // Precio del documento principal (último correo subido)
         version: juegoData?.version || plataforma,
         foto: juegoDocData.foto || '', // Foto del documento principal
         isOffert: juegoDocData.isOffert || false, // Legacy
@@ -157,6 +160,7 @@ export function useGames() {
   ): Promise<void> => {
     try {
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
 
       const correoData = {
         nombre: datosCorreo.nombre,
@@ -172,7 +176,15 @@ export function useGames() {
         createdBy: datosCorreo.createdBy
       }
 
+      // Crear el correo
       await setDoc(correoRef, correoData)
+
+      // Actualizar el precio del juego en el documento principal
+      // El último correo subido actualiza el precio del juego
+      await setDoc(juegoRef, {
+        costo: datosCorreo.costo,
+        ultimaActualizacionPrecio: Timestamp.now()
+      }, { merge: true })
     } catch (error) {
       console.error('Error creando correo:', error)
       throw error
@@ -187,6 +199,7 @@ export function useGames() {
   ): Promise<void> => {
     try {
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
 
       const datosActualizados: Record<string, any> = {
         ...datos,
@@ -198,6 +211,14 @@ export function useGames() {
       }
 
       await updateDoc(correoRef, datosActualizados)
+
+      // Si se actualiza el costo, también actualizar el precio del juego
+      if (datos.costo !== undefined) {
+        await setDoc(juegoRef, {
+          costo: datos.costo,
+          ultimaActualizacionPrecio: Timestamp.now()
+        }, { merge: true })
+      }
     } catch (error) {
       console.error('Error actualizando correo:', error)
       throw error

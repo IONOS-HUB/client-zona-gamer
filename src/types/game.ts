@@ -50,6 +50,8 @@ export interface GameDocument {
   foto?: string
   isOffert?: boolean // Legacy - mantener por compatibilidad
   tipoPromocion?: PromocionType
+  costo?: number // Precio actual del juego (actualizado por el último correo)
+  ultimaActualizacionPrecio?: Date // Fecha del último correo que actualizó el precio
 }
 
 export interface GameFilters {
