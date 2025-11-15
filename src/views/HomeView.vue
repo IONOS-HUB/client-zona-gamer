@@ -5,6 +5,8 @@ import { useCartStore } from '@/stores/cart'
 import type { GamePlatform } from '@/types/game'
 import AppNavbar from '@/components/ui/AppNavbar.vue'
 import CartModal from '@/components/ui/CartModal.vue'
+import OffersSection from '@/components/sections/OffersSection.vue'
+import PromotionsSection from '@/components/sections/PromotionsSection.vue'
 import TrendingGamesSection from '@/components/sections/TrendingGamesSection.vue'
 import SearchResultsSection from '@/components/sections/SearchResultsSection.vue'
 import AllGamesSection from '@/components/sections/AllGamesSection.vue'
@@ -28,10 +30,33 @@ const itemsPerPage = 12
 const currentPageAll = ref(1)
 const currentPageSearch = ref(1)
 
-// Juegos destacados (con descuentos o marcados como destacados)
+// Juegos en OFERTA (para sección superior destacada)
+const juegosEnOferta = computed(() => {
+  return games.value.filter(juego => 
+    juego.tipoPromocion === 'oferta' || juego.isOffert
+  )
+})
+
+// Juegos en PROMOCIÓN (destacados especiales)
+const juegosEnPromocion = computed(() => {
+  return games.value.filter(juego => 
+    juego.tipoPromocion === 'promocion'
+  )
+})
+
+// Juegos destacados (legacy - con descuentos o marcados como destacados)
 const juegosDestacados = computed(() => {
   return games.value.filter(juego => 
     juego.destacado || (juego.descuento && juego.descuento > 0)
+  )
+})
+
+// Todas las ofertas y promociones combinadas (para sección inferior)
+const todasLasOfertas = computed(() => {
+  return games.value.filter(juego => 
+    juego.tipoPromocion === 'oferta' || 
+    juego.tipoPromocion === 'promocion' ||
+    juego.isOffert
   )
 })
 
@@ -188,9 +213,6 @@ onMounted(() => {
       </div>
 
       <template v-else>
-        <!-- Sección de Ofertas/En Tendencias -->
-        <TrendingGamesSection :games="juegosDestacados" />
-
         <!-- Resultados de búsqueda (solo cuando hay búsqueda) -->
         <SearchResultsSection 
           v-if="searchTerm"
@@ -204,6 +226,27 @@ onMounted(() => {
 
         <!-- Secciones adicionales (solo sin búsqueda) -->
         <template v-if="!searchTerm">
+          <!-- SECCIÓN 1: OFERTAS ESPECIALES (Parte Superior) -->
+          <OffersSection 
+            :games="juegosEnOferta"
+            title="Ofertas Especiales"
+            subtitle="¡Aprovecha estos precios increíbles antes de que terminen!"
+            variant="primary"
+          />
+
+          <!-- SECCIÓN 2: PROMOCIONES DESTACADAS -->
+          <PromotionsSection 
+            :games="juegosEnPromocion"
+            title="Promociones Destacadas"
+            subtitle="Los mejores juegos seleccionados para ti"
+          />
+
+          <!-- Sección de Ofertas/En Tendencias (Legacy - solo si hay juegos destacados antiguos) -->
+          <TrendingGamesSection 
+            v-if="juegosDestacados.length > 0"
+            :games="juegosDestacados" 
+          />
+
           <!-- Sección de Combos -->
           <ComboSection />
 
@@ -262,6 +305,27 @@ onMounted(() => {
               @view-more="handleViewMorePS5"
             />
           </div>
+
+          <!-- Separador decorativo especial para ofertas finales -->
+          <div class="relative my-20 animate-fadeInUp">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t-2 border-error/20"></div>
+            </div>
+            <div class="relative flex justify-center">
+              <span class="px-8 py-3 bg-gradient-to-r from-error/20 via-warning/20 to-error/20 text-base font-bold glass-effect rounded-full border-2 border-error/30 shadow-lg">
+                No Te Pierdas Estas Ofertas
+              </span>
+            </div>
+          </div>
+
+          <!-- SECCIÓN FINAL: TODAS LAS OFERTAS Y PROMOCIONES (Parte Inferior) -->
+          <OffersSection 
+            v-if="todasLasOfertas.length > 0"
+            :games="todasLasOfertas"
+            title="Todas las Ofertas y Promociones"
+            subtitle="¡Toda nuestra selección de juegos en oferta en un solo lugar!"
+            variant="secondary"
+          />
         </template>
       </template>
     </div>

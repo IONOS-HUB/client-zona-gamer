@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { useRoles } from '@/composables/useRoles'
 import { useCartStore } from '@/stores/cart'
-import { Search, ShoppingCart, User, Send, Gamepad2 } from 'lucide-vue-next'
+import { Search, ShoppingCart, User, Send, Gamepad2, LayoutDashboard } from 'lucide-vue-next'
 import type { GamePlatform } from '@/types/game'
 import logo from '/Images/logo/logo.png'
 
 const router = useRouter()
 const { currentUser, signOut } = useAuth()
+const { currentUserData, isAdmin, hasEmployeeAccess, loadUserData } = useRoles()
 const cartStore = useCartStore()
 
 const searchQuery = ref('')
@@ -29,6 +31,20 @@ const handleLogout = async (): Promise<void> => {
 const irALogin = (): void => {
   router.push('/login')
 }
+
+const irAlDashboard = (): void => {
+  if (isAdmin.value) {
+    router.push('/admin')
+  } else if (hasEmployeeAccess.value) {
+    router.push('/employee')
+  }
+}
+
+onMounted(() => {
+  if (currentUser.value) {
+    loadUserData()
+  }
+})
 
 const openCart = (): void => {
   emit('openCart')
@@ -200,14 +216,38 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               </div>
               <ul
                 tabindex="0"
-                class="mt-3 z-1 p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-52 border border-white/10 animate-scaleIn"
+                class="mt-3 z-100 p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-60 border border-white/10 animate-scaleIn"
               >
+                <!-- Información del usuario -->
                 <li class="menu-title">
-                  <span class="text-xs">{{ currentUser.email }}</span>
+                  <div class="flex flex-col gap-1 py-2">
+                    <span class="text-xs font-semibold text-base-content/90">{{ currentUser.email }}</span>
+                    <span v-if="currentUserData" class="text-xs badge badge-sm" :class="isAdmin ? 'badge-error' : hasEmployeeAccess ? 'badge-warning' : 'badge-ghost'">
+                      {{ isAdmin ? 'Administrador' : hasEmployeeAccess ? 'Empleado' : 'Cliente' }}
+                    </span>
+                  </div>
                 </li>
-                <li><a class="hover:bg-error/20 hover:text-error transition-all">Mis Pedidos</a></li>
-                <li><a class="hover:bg-primary/20 hover:text-primary transition-all">Configuración</a></li>
-                <li><a @click="handleLogout" class="text-error hover:bg-error/20 transition-all">Cerrar Sesión</a></li>
+                
+                <div class="divider my-1"></div>
+                
+                <!-- Opción Dashboard (solo para admin y empleados) -->
+                <li v-if="isAdmin || hasEmployeeAccess">
+                  <a @click="irAlDashboard" class="hover:bg-primary/20 hover:text-primary transition-all gap-3">
+                    <LayoutDashboard :size="18" />
+                    <span>Panel de Control</span>
+                  </a>
+                </li>
+                <div class="divider my-1"></div>
+                
+                <!-- Cerrar sesión -->
+                <li>
+                  <a @click="handleLogout" class="text-error hover:bg-error/20 transition-all gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Cerrar Sesión</span>
+                  </a>
+                </li>
               </ul>
             </div>
             <button v-else @click="irALogin" class="btn btn-ghost btn-circle hover:bg-primary/20 hover:shadow-glow-primary transition-all duration-300 hover:scale-110">
