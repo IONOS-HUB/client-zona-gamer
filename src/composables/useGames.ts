@@ -52,13 +52,22 @@ export function useGames() {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ')
 
+      // Determinar tipo de promoción (migrar de isOffert si existe)
+      let tipoPromocion: 'ninguna' | 'oferta' | 'promocion' = 'ninguna'
+      if (juegoDocData.tipoPromocion) {
+        tipoPromocion = juegoDocData.tipoPromocion
+      } else if (juegoDocData.isOffert === true) {
+        tipoPromocion = 'oferta' // Migración automática
+      }
+
       juegosMap.set(juegoId, {
         id: juegoId,
-        nombre: juegoData?.nombre || nombreFromId,
+        nombre: juegoDocData.nombre || juegoData?.nombre || nombreFromId,
         costo: juegoData?.costo || 0,
         version: juegoData?.version || plataforma,
         foto: juegoDocData.foto || '', // Foto del documento principal
-        isOffert: juegoDocData.isOffert || false, // Si está en oferta
+        isOffert: juegoDocData.isOffert || false, // Legacy
+        tipoPromocion, // Nuevo campo de tipo de promoción
         totalCorreos: correos.length,
         correos
       })
@@ -266,15 +275,25 @@ export function useGames() {
   const actualizarJuego = async (
     plataforma: GamePlatform,
     juegoId: string,
-    foto?: string,
-    isOffert?: boolean
+    datos: {
+      nombre?: string
+      foto?: string
+      isOffert?: boolean
+      tipoPromocion?: 'ninguna' | 'oferta' | 'promocion'
+    }
   ): Promise<void> => {
     try {
       const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
       const updateData: Record<string, any> = {}
       
-      if (foto !== undefined) updateData.foto = foto
-      if (isOffert !== undefined) updateData.isOffert = isOffert
+      if (datos.nombre !== undefined) updateData.nombre = datos.nombre
+      if (datos.foto !== undefined) updateData.foto = datos.foto
+      if (datos.tipoPromocion !== undefined) {
+        updateData.tipoPromocion = datos.tipoPromocion
+        // Actualizar también isOffert para compatibilidad
+        updateData.isOffert = datos.tipoPromocion === 'oferta'
+      }
+      if (datos.isOffert !== undefined) updateData.isOffert = datos.isOffert
       
       await setDoc(juegoRef, updateData, { merge: true })
     } catch (error) {

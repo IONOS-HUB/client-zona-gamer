@@ -78,20 +78,21 @@ const deleteSuccess = ref('')
 const showEmailDetails = ref(false)
 const selectedEmailDetails = ref<GameEmailAccount | null>(null)
 
-// Estados para editar foto del juego
-const showEditPhoto = ref(false)
-const editingGamePhoto = ref<GameSummary | null>(null)
-const newPhotoUrl = ref('')
-const newIsOffert = ref(false)
-const isUpdatingPhoto = ref(false)
-const photoError = ref('')
-const photoSuccess = ref('')
+// Estados para editar juego
+const showEditGame = ref(false)
+const editingGame = ref<GameSummary | null>(null)
+const editGameName = ref('')
+const editPhotoUrl = ref('')
+const editTipoPromocion = ref<'ninguna' | 'oferta' | 'promocion'>('ninguna')
+const isUpdatingGame = ref(false)
+const editGameError = ref('')
+const editGameSuccess = ref('')
 
 // Estados para crear juego nuevo
 const showCreateGame = ref(false)
 const newGameName = ref('')
 const newGamePhoto = ref('')
-const newGameIsOffert = ref(false)
+const newGameTipoPromocion = ref<'ninguna' | 'oferta' | 'promocion'>('ninguna')
 const isCreatingGame = ref(false)
 const createGameError = ref('')
 const createGameSuccess = ref('')
@@ -512,7 +513,7 @@ const cerrarDetalles = (): void => {
 const iniciarCreacionJuego = (): void => {
   newGameName.value = ''
   newGamePhoto.value = ''
-  newGameIsOffert.value = false
+  newGameTipoPromocion.value = 'ninguna'
   createGameError.value = ''
   createGameSuccess.value = ''
   showCreateGame.value = true
@@ -529,11 +530,20 @@ const handleCreateGame = async (): Promise<void> => {
   createGameSuccess.value = ''
 
   try {
-    await crearJuego(
+    const juegoId = await crearJuego(
       plataformaSeleccionada.value,
       newGameName.value.trim(),
       newGamePhoto.value.trim() || undefined,
-      newGameIsOffert.value
+      newGameTipoPromocion.value === 'oferta' // Legacy support
+    )
+    
+    // Actualizar con el nuevo campo de tipo de promoción
+    await actualizarJuego(
+      plataformaSeleccionada.value,
+      juegoId,
+      {
+        tipoPromocion: newGameTipoPromocion.value
+      }
     )
 
     createGameSuccess.value = 'Juego creado exitosamente'
@@ -555,62 +565,74 @@ const cerrarCrearJuego = (): void => {
   showCreateGame.value = false
   newGameName.value = ''
   newGamePhoto.value = ''
-  newGameIsOffert.value = false
+  newGameTipoPromocion.value = 'ninguna'
   createGameError.value = ''
 }
 
-const iniciarEdicionFoto = (juego: GameSummary): void => {
-  editingGamePhoto.value = juego
-  newPhotoUrl.value = juego.foto || ''
-  newIsOffert.value = juego.isOffert || false
-  photoError.value = ''
-  photoSuccess.value = ''
-  showEditPhoto.value = true
+const iniciarEdicionJuego = (juego: GameSummary): void => {
+  editingGame.value = juego
+  editGameName.value = juego.nombre
+  editPhotoUrl.value = juego.foto || ''
+  editTipoPromocion.value = juego.tipoPromocion || 'ninguna'
+  editGameError.value = ''
+  editGameSuccess.value = ''
+  showEditGame.value = true
 }
 
-const handleUpdatePhoto = async (): Promise<void> => {
-  if (!editingGamePhoto.value) return
+const handleUpdateGame = async (): Promise<void> => {
+  if (!editingGame.value) return
+  
+  if (!editGameName.value.trim()) {
+    editGameError.value = 'Por favor ingresa el nombre del juego'
+    return
+  }
 
-  isUpdatingPhoto.value = true
-  photoError.value = ''
-  photoSuccess.value = ''
+  isUpdatingGame.value = true
+  editGameError.value = ''
+  editGameSuccess.value = ''
 
   try {
     await actualizarJuego(
       plataformaSeleccionada.value,
-      editingGamePhoto.value.id,
-      newPhotoUrl.value.trim() || undefined,
-      newIsOffert.value
+      editingGame.value.id,
+      {
+        nombre: editGameName.value.trim(),
+        foto: editPhotoUrl.value.trim() || undefined,
+        tipoPromocion: editTipoPromocion.value
+      }
     )
 
-    photoSuccess.value = 'Información actualizada exitosamente'
+    editGameSuccess.value = 'Juego actualizado exitosamente'
     
     // Actualizar en la lista local
-    const juegoIndex = games.value.findIndex(j => j.id === editingGamePhoto.value?.id)
+    const juegoIndex = games.value.findIndex(j => j.id === editingGame.value?.id)
     if (juegoIndex !== -1) {
-      games.value[juegoIndex]!.foto = newPhotoUrl.value.trim()
-      games.value[juegoIndex]!.isOffert = newIsOffert.value
+      games.value[juegoIndex]!.nombre = editGameName.value.trim()
+      games.value[juegoIndex]!.foto = editPhotoUrl.value.trim()
+      games.value[juegoIndex]!.tipoPromocion = editTipoPromocion.value
+      games.value[juegoIndex]!.isOffert = editTipoPromocion.value === 'oferta'
     }
 
     setTimeout(() => {
-      showEditPhoto.value = false
-      photoSuccess.value = ''
-      editingGamePhoto.value = null
+      showEditGame.value = false
+      editGameSuccess.value = ''
+      editingGame.value = null
     }, 1500)
   } catch (error) {
-    console.error('Error actualizando información:', error)
-    photoError.value = 'Error al actualizar la información'
+    console.error('Error actualizando juego:', error)
+    editGameError.value = 'Error al actualizar el juego'
   } finally {
-    isUpdatingPhoto.value = false
+    isUpdatingGame.value = false
   }
 }
 
-const cerrarEditarFoto = (): void => {
-  showEditPhoto.value = false
-  editingGamePhoto.value = null
-  newPhotoUrl.value = ''
-  newIsOffert.value = false
-  photoError.value = ''
+const cerrarEditarJuego = (): void => {
+  showEditGame.value = false
+  editingGame.value = null
+  editGameName.value = ''
+  editPhotoUrl.value = ''
+  editTipoPromocion.value = 'ninguna'
+  editGameError.value = ''
 }
 
 
@@ -713,12 +735,12 @@ onMounted(async () => {
       </div>
 
       <!-- Mensajes -->
-      <div v-if="createSuccess || editSuccess || deleteSuccess || photoSuccess || createGameSuccess" class="alert alert-success mb-4">
-        <span>{{ createSuccess || editSuccess || deleteSuccess || photoSuccess || createGameSuccess }}</span>
+      <div v-if="createSuccess || editSuccess || deleteSuccess || editGameSuccess || createGameSuccess" class="alert alert-success mb-4">
+        <span>{{ createSuccess || editSuccess || deleteSuccess || editGameSuccess || createGameSuccess }}</span>
       </div>
 
-      <div v-if="deleteError || photoError || createGameError" class="alert alert-error mb-4">
-        <span>{{ deleteError || photoError || createGameError }}</span>
+      <div v-if="deleteError || editGameError || createGameError" class="alert alert-error mb-4">
+        <span>{{ deleteError || editGameError || createGameError }}</span>
       </div>
 
       <!-- Vista de Juegos -->
@@ -792,10 +814,11 @@ onMounted(async () => {
                       <button
                         v-if="isAdmin"
                         class="btn btn-sm btn-warning"
-                        @click="iniciarEdicionFoto(juego)"
+                        @click="iniciarEdicionJuego(juego)"
+                        title="Editar juego"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
                       <button
@@ -1273,26 +1296,51 @@ onMounted(async () => {
 
     <!-- Modal para crear juego nuevo -->
     <dialog :class="['modal', { 'modal-open': showCreateGame }]">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Crear Nuevo Juego</h3>
+      <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-2xl mb-6 flex items-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Crear Nuevo Juego
+        </h3>
         
-        <form @submit.prevent="handleCreateGame" class="space-y-4">
+        <form @submit.prevent="handleCreateGame" class="space-y-6">
+          <!-- Nombre del Juego -->
           <div class="form-control">
             <label class="label">
-              <span class="label-text">Nombre del Juego *</span>
+              <span class="label-text font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Nombre del Juego *
+              </span>
             </label>
             <input
               v-model="newGameName"
               type="text"
               placeholder="Ej: God of War Ragnarök"
-              class="input input-bordered"
+              class="input input-bordered input-lg"
               required
             />
+            <label class="label">
+              <span class="label-text-alt">Este nombre será visible para los clientes</span>
+            </label>
+          </div>
+
+          <!-- Sección de Imagen -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Imagen del Juego
+            </span>
           </div>
 
           <div class="form-control">
             <label class="label">
-              <span class="label-text">URL de la Foto</span>
+              <span class="label-text font-medium">URL de la Foto</span>
+              <span class="label-text-alt text-xs opacity-60">Opcional</span>
             </label>
             <input
               v-model="newGamePhoto"
@@ -1300,53 +1348,122 @@ onMounted(async () => {
               placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
               class="input input-bordered"
             />
-            <label class="label">
-              <span class="label-text-alt">Ingresa la URL completa de la imagen (opcional)</span>
-            </label>
           </div>
 
           <!-- Preview de la nueva foto -->
           <div v-if="newGamePhoto" class="form-control">
             <label class="label">
-              <span class="label-text">Vista Previa</span>
+              <span class="label-text font-medium">Vista Previa</span>
             </label>
-            <div class="avatar">
-              <div class="w-32 rounded">
-                <img 
-                  :src="newGamePhoto" 
-                  alt="Preview"
-                  @error="(e) => (e.target as HTMLImageElement).src = ''"
-                />
+            <div class="flex justify-center bg-base-200 rounded-lg p-4">
+              <div class="avatar">
+                <div class="w-48 rounded-lg shadow-lg">
+                  <img 
+                    :src="newGamePhoto" 
+                    alt="Preview"
+                    class="object-cover"
+                    @error="(e) => (e.target as HTMLImageElement).src = ''"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="form-control">
-            <label class="label cursor-pointer">
-              <span class="label-text">¿Está en oferta?</span>
-              <input type="checkbox" v-model="newGameIsOffert" class="toggle toggle-primary" />
-            </label>
+          <!-- Tipo de Promoción -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Tipo de Promoción
+            </span>
           </div>
 
-          <div v-if="createGameError" class="alert alert-error">
+          <div class="form-control bg-base-200 rounded-lg p-4">
+            <div class="grid grid-cols-3 gap-3">
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="newGameTipoPromocion === 'ninguna' ? 'border-primary bg-primary/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="newGamePromocion" 
+                    value="ninguna" 
+                    v-model="newGameTipoPromocion" 
+                    class="radio radio-primary" 
+                  />
+                  <span class="font-medium text-sm">Ninguna</span>
+                  <span class="text-xs opacity-60">Sin promoción</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="newGameTipoPromocion === 'oferta' ? 'border-success bg-success/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="newGamePromocion" 
+                    value="oferta" 
+                    v-model="newGameTipoPromocion" 
+                    class="radio radio-success" 
+                  />
+                  <span class="font-medium text-sm">Oferta</span>
+                  <span class="text-xs opacity-60">Precio especial</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="newGameTipoPromocion === 'promocion' ? 'border-warning bg-warning/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="newGamePromocion" 
+                    value="promocion" 
+                    v-model="newGameTipoPromocion" 
+                    class="radio radio-warning" 
+                  />
+                  <span class="font-medium text-sm">Promoción</span>
+                  <span class="text-xs opacity-60">Destacado</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Mensaje de error -->
+          <div v-if="createGameError" class="alert alert-error shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             <span>{{ createGameError }}</span>
           </div>
 
+          <!-- Botones de acción -->
           <div class="modal-action">
             <button
               type="button"
-              class="btn"
+              class="btn btn-ghost"
               @click="cerrarCrearJuego"
               :disabled="isCreatingGame"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
               Cancelar
             </button>
             <button
               type="submit"
-              class="btn btn-primary"
+              class="btn btn-primary btn-lg"
               :disabled="isCreatingGame"
             >
               <span v-if="isCreatingGame" class="loading loading-spinner"></span>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
               {{ isCreatingGame ? 'Creando...' : 'Crear Juego' }}
             </button>
           </div>
@@ -1357,96 +1474,215 @@ onMounted(async () => {
       </form>
     </dialog>
 
-    <!-- Modal para editar foto del juego -->
-    <dialog :class="['modal', { 'modal-open': showEditPhoto }]">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Editar Información del Juego</h3>
+    <!-- Modal para editar juego -->
+    <dialog :class="['modal', { 'modal-open': showEditGame }]">
+      <div class="modal-box max-w-3xl">
+        <h3 class="font-bold text-2xl mb-6">Editar Juego</h3>
 
-        <form @submit.prevent="handleUpdatePhoto" class="space-y-4">
-          <div v-if="editingGamePhoto" class="alert alert-info">
-            <span>Editando información de: {{ editingGamePhoto.nombre }}</span>
-          </div>
-
-          <!-- Preview de la foto actual -->
-          <div v-if="editingGamePhoto?.foto" class="form-control">
-            <label class="label">
-              <span class="label-text">Foto Actual</span>
-            </label>
-            <div class="avatar">
-              <div class="w-32 rounded">
-                <img :src="editingGamePhoto.foto" :alt="editingGamePhoto.nombre" />
+        <form @submit.prevent="handleUpdateGame" class="space-y-6">
+          <!-- Info del juego que se está editando -->
+          <div v-if="editingGame" class="bg-base-200 rounded-lg p-4">
+            <div class="flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <span class="text-sm opacity-70">ID del juego:</span>
+                <span class="font-mono ml-2 font-semibold">{{ editingGame.id }}</span>
               </div>
             </div>
           </div>
 
+          <!-- Nombre del Juego -->
           <div class="form-control">
             <label class="label">
-              <span class="label-text">URL de la Foto</span>
+              <span class="label-text font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Nombre del Juego *
+              </span>
             </label>
             <input
-              v-model="newPhotoUrl"
+              v-model="editGameName"
+              type="text"
+              placeholder="Ej: God of War Ragnarök"
+              class="input input-bordered input-lg"
+              required
+            />
+          </div>
+
+          <!-- Sección de Imágenes -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Imagen del Juego
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Foto Actual -->
+            <div v-if="editingGame?.foto" class="form-control">
+              <label class="label">
+                <span class="label-text font-medium">Foto Actual</span>
+              </label>
+              <div class="flex justify-center bg-base-200 rounded-lg p-4">
+                <div class="avatar">
+                  <div class="w-48 rounded-lg shadow-lg">
+                    <img :src="editingGame.foto" :alt="editingGame.nombre" class="object-cover" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview de Nueva Foto -->
+            <div v-if="editPhotoUrl && editPhotoUrl !== editingGame?.foto" class="form-control">
+              <label class="label">
+                <span class="label-text font-medium flex items-center gap-2">
+                  <span class="badge badge-success badge-sm">Nueva</span>
+                  Vista Previa
+                </span>
+              </label>
+              <div class="flex justify-center bg-base-200 rounded-lg p-4">
+                <div class="avatar">
+                  <div class="w-48 rounded-lg shadow-lg">
+                    <img 
+                      :src="editPhotoUrl" 
+                      alt="Preview"
+                      class="object-cover"
+                      @error="(e) => (e.target as HTMLImageElement).src = ''"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- URL de la Foto -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-medium">URL de la Foto</span>
+              <span class="label-text-alt text-xs opacity-60">Opcional</span>
+            </label>
+            <input
+              v-model="editPhotoUrl"
               type="url"
               placeholder="https://ecuadorjuegosdigitales.com/wp-content/uploads/..."
               class="input input-bordered"
             />
-            <label class="label">
-              <span class="label-text-alt">Ingresa la URL completa de la imagen (opcional)</span>
-            </label>
           </div>
 
-          <!-- Preview de la nueva foto -->
-          <div v-if="newPhotoUrl" class="form-control">
-            <label class="label">
-              <span class="label-text">Vista Previa</span>
-            </label>
-            <div class="avatar">
-              <div class="w-32 rounded">
-                <img 
-                  :src="newPhotoUrl" 
-                  alt="Preview"
-                  @error="(e) => (e.target as HTMLImageElement).src = ''"
-                />
-              </div>
+          <!-- Tipo de Promoción -->
+          <div class="divider">
+            <span class="flex items-center gap-2 text-sm font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Tipo de Promoción
+            </span>
+          </div>
+
+          <div class="form-control bg-base-200 rounded-lg p-4">
+            <div class="grid grid-cols-3 gap-3">
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="editTipoPromocion === 'ninguna' ? 'border-primary bg-primary/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="editPromocion" 
+                    value="ninguna" 
+                    v-model="editTipoPromocion" 
+                    class="radio radio-primary" 
+                  />
+                  <span class="font-medium text-sm">Ninguna</span>
+                  <span class="text-xs opacity-60">Sin promoción</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="editTipoPromocion === 'oferta' ? 'border-success bg-success/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="editPromocion" 
+                    value="oferta" 
+                    v-model="editTipoPromocion" 
+                    class="radio radio-success" 
+                  />
+                  <span class="font-medium text-sm">Oferta</span>
+                  <span class="text-xs opacity-60">Precio especial</span>
+                </div>
+              </label>
+              
+              <label 
+                class="cursor-pointer rounded-lg border-2 transition-all duration-200 p-4 hover:bg-base-300"
+                :class="editTipoPromocion === 'promocion' ? 'border-warning bg-warning/10' : 'border-base-300'"
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="editPromocion" 
+                    value="promocion" 
+                    v-model="editTipoPromocion" 
+                    class="radio radio-warning" 
+                  />
+                  <span class="font-medium text-sm">Promoción</span>
+                  <span class="text-xs opacity-60">Destacado</span>
+                </div>
+              </label>
             </div>
           </div>
 
-          <div class="form-control">
-            <label class="label cursor-pointer">
-              <span class="label-text">¿Está en oferta?</span>
-              <input type="checkbox" v-model="newIsOffert" class="toggle toggle-primary" />
-            </label>
+          <!-- Mensajes de error/éxito -->
+          <div v-if="editGameError" class="alert alert-error shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ editGameError }}</span>
           </div>
 
-          <div v-if="photoError" class="alert alert-error">
-            <span>{{ photoError }}</span>
+          <div v-if="editGameSuccess" class="alert alert-success shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ editGameSuccess }}</span>
           </div>
 
-          <div v-if="photoSuccess" class="alert alert-success">
-            <span>{{ photoSuccess }}</span>
-          </div>
-
+          <!-- Botones de acción -->
           <div class="modal-action">
             <button
               type="button"
-              class="btn"
-              @click="cerrarEditarFoto"
-              :disabled="isUpdatingPhoto"
+              class="btn btn-ghost"
+              @click="cerrarEditarJuego"
+              :disabled="isUpdatingGame"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
               Cancelar
             </button>
             <button
               type="submit"
-              class="btn btn-primary"
-              :disabled="isUpdatingPhoto"
+              class="btn btn-primary btn-lg"
+              :disabled="isUpdatingGame"
             >
-              <span v-if="isUpdatingPhoto" class="loading loading-spinner"></span>
-              {{ isUpdatingPhoto ? 'Guardando...' : 'Guardar Cambios' }}
+              <span v-if="isUpdatingGame" class="loading loading-spinner"></span>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ isUpdatingGame ? 'Guardando...' : 'Guardar Cambios' }}
             </button>
           </div>
         </form>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button @click="cerrarEditarFoto">close</button>
+        <button @click="cerrarEditarJuego">close</button>
       </form>
     </dialog>
 

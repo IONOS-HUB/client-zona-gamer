@@ -2,6 +2,8 @@ export type GamePlatform = 'PS4 & PS5' | 'PS4' | 'PS5' | 'Xbox' | 'Nintendo Swit
 
 export type AccountType = 'Principal PS4' | 'Secundaria PS4' | 'Principal PS5'
 
+export type PromocionType = 'ninguna' | 'oferta' | 'promocion'
+
 export interface AccountOwner {
   nombre: string
   telefono: string
@@ -31,7 +33,8 @@ export interface GameSummary {
   costo: number
   version: GamePlatform
   foto?: string // URL de la imagen del juego
-  isOffert?: boolean // Si el juego está en oferta
+  isOffert?: boolean // Si el juego está en oferta (legacy - mantener por compatibilidad)
+  tipoPromocion?: PromocionType // Tipo de promoción: ninguna, oferta o promocion
   totalCorreos: number
   correos: string[] // Lista de correos asociados
   descuento?: number // Porcentaje de descuento (0-100)
@@ -43,8 +46,10 @@ export interface GameSummary {
 
 // Datos del documento principal del juego (a_way_out)
 export interface GameDocument {
+  nombre?: string
   foto?: string
-  isOffert?: boolean
+  isOffert?: boolean // Legacy - mantener por compatibilidad
+  tipoPromocion?: PromocionType
 }
 
 export interface GameFilters {
