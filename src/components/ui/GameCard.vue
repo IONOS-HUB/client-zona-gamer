@@ -116,6 +116,22 @@ const stars = computed(() => {
         </svg>
       </div>
 
+      <!-- Ribbon de OFERTA - Esquina superior derecha -->
+      <div 
+        v-if="game.tipoPromocion === 'oferta' || game.isOffert"
+        class="ribbon ribbon-oferta"
+      >
+        <span>OFERTA</span>
+      </div>
+
+      <!-- Ribbon de PROMOCIÓN - Esquina superior derecha -->
+      <div 
+        v-else-if="game.tipoPromocion === 'promocion'"
+        class="ribbon ribbon-promocion"
+      >
+        <span>PROMO</span>
+      </div>
+
       <!-- Badge de descuento - Sobre la imagen en esquina inferior izquierda -->
       <div 
         v-if="game.descuento && game.descuento > 0" 
@@ -124,9 +140,9 @@ const stars = computed(() => {
         -{{ game.descuento }}%
       </div>
 
-      <!-- Badge DESTACADO - Sobre la imagen en esquina superior derecha -->
+      <!-- Badge DESTACADO - Sobre la imagen (solo si no hay ribbon) -->
       <div 
-        v-if="game.destacado" 
+        v-if="game.destacado && game.tipoPromocion !== 'oferta' && !game.isOffert && game.tipoPromocion !== 'promocion'" 
         class="absolute top-2 right-2 z-20 badge badge-warning text-white font-bold px-1.5 py-0.5 text-[10px] leading-none"
       >
         ⭐
@@ -212,6 +228,103 @@ const stars = computed(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Ribbon - Estilo de esquina doblada */
+.ribbon {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 30;
+  overflow: hidden;
+  width: 90px;
+  height: 90px;
+  text-align: right;
+}
+
+.ribbon span {
+  font-size: 10px;
+  font-weight: 900;
+  color: #fff;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 24px;
+  transform: rotate(45deg);
+  width: 110px;
+  display: block;
+  position: absolute;
+  top: 19px;
+  right: -25px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Ribbon de Oferta - Rojo */
+.ribbon-oferta span {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  border: 1px solid #7f1d1d;
+}
+
+.ribbon-oferta span::before,
+.ribbon-oferta span::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  z-index: -1;
+  border: 3px solid #991b1b;
+  border-top-color: transparent;
+  border-right-color: transparent;
+}
+
+.ribbon-oferta span::before {
+  left: 0;
+  border-left-color: transparent;
+}
+
+.ribbon-oferta span::after {
+  right: 0;
+  border-right-color: transparent;
+}
+
+/* Ribbon de Promoción - Naranja/Amarillo */
+.ribbon-promocion span {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 1px solid #b45309;
+}
+
+.ribbon-promocion span::before,
+.ribbon-promocion span::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  z-index: -1;
+  border: 3px solid #d97706;
+  border-top-color: transparent;
+  border-right-color: transparent;
+}
+
+.ribbon-promocion span::before {
+  left: 0;
+  border-left-color: transparent;
+}
+
+.ribbon-promocion span::after {
+  right: 0;
+  border-right-color: transparent;
+}
+
+/* Animación de pulso para el ribbon */
+@keyframes ribbon-pulse {
+  0%, 100% {
+    transform: rotate(45deg) scale(1);
+  }
+  50% {
+    transform: rotate(45deg) scale(1.05);
+  }
+}
+
+.ribbon:hover span {
+  animation: ribbon-pulse 0.6s ease-in-out;
 }
 </style>
 
