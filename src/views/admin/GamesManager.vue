@@ -713,8 +713,6 @@ onMounted(async () => {
             <option value="PS4 & PS5">PS4 & PS5</option>
             <option value="PS4">PS4</option>
             <option value="PS5">PS5</option>
-            <option value="Xbox">Xbox</option>
-            <option value="Nintendo Switch">Nintendo Switch</option>
           </select>
 
           <input
@@ -1351,11 +1349,9 @@ onMounted(async () => {
               <option value="PS4 & PS5">PS4 & PS5</option>
               <option value="PS4">PS4</option>
               <option value="PS5">PS5</option>
-              <option value="Xbox">Xbox</option>
-              <option value="Nintendo Switch">Nintendo Switch</option>
             </select>
             <label class="label">
-              <span class="label-text-alt">Esta categoría se usa para filtrar en la tienda</span>
+              <span class="label-text-alt">Selecciona: PS4, PS5 o PS4 & PS5 (ambas)</span>
             </label>
           </div>
 
@@ -1558,11 +1554,9 @@ onMounted(async () => {
               <option value="PS4 & PS5">PS4 & PS5</option>
               <option value="PS4">PS4</option>
               <option value="PS5">PS5</option>
-              <option value="Xbox">Xbox</option>
-              <option value="Nintendo Switch">Nintendo Switch</option>
             </select>
             <label class="label">
-              <span class="label-text-alt">Esta categoría se usa para filtrar en la tienda</span>
+              <span class="label-text-alt">Selecciona: PS4, PS5 o PS4 & PS5 (ambas)</span>
             </label>
           </div>
 

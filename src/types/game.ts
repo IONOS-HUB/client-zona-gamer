@@ -1,4 +1,4 @@
-export type GamePlatform = 'PS4 & PS5' | 'PS4' | 'PS5' | 'Xbox' | 'Nintendo Switch'
+export type GamePlatform = 'PS4 & PS5' | 'PS4' | 'PS5'
 
 export type AccountType = 'Principal PS4' | 'Secundaria PS4' | 'Principal PS5'
 
