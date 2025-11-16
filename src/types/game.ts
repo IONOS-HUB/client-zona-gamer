@@ -8,6 +8,7 @@ export interface AccountOwner {
   nombre: string
   telefono: string
   tipo: AccountType
+  saldo?: number // Saldo opcional de la cuenta
 }
 
 // Cada correo dentro de un juego tiene toda esta información

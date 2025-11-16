@@ -450,6 +450,7 @@ const irAHome = (): void => {
             <table class="table">
               <thead>
                 <tr>
+                  <th>#</th>
                   <th>Nombre</th>
                   <th>Email</th>
                   <th>Tipo</th>
@@ -458,7 +459,8 @@ const irAHome = (): void => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="employee in employees" :key="employee.uid">
+                <tr v-for="(employee, index) in employees" :key="employee.uid">
+                  <td>{{ index + 1 }}</td>
                   <td>{{ employee.displayName || 'Sin nombre' }}</td>
                   <td>
                     {{ employee.email }}

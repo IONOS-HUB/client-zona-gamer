@@ -795,6 +795,7 @@ onMounted(async () => {
             <table class="table table-zebra">
               <thead>
                 <tr>
+                  <th>#</th>
                   <th>Foto</th>
                   <th>Nombre del Juego</th>
                   <th>Precio</th>
@@ -803,7 +804,8 @@ onMounted(async () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="juego in juegosFiltrados" :key="juego.id">
+                <tr v-for="(juego, index) in juegosFiltrados" :key="juego.id">
+                  <td>{{ index + 1 }}</td>
                   <td>
                     <div class="avatar">
                       <div class="w-16 rounded">
@@ -896,6 +898,7 @@ onMounted(async () => {
             <table class="table table-zebra">
               <thead>
                 <tr>
+                  <th>#</th>
                   <th>Correo</th>
                   <th>Códigos</th>
                   <th>Cuentas</th>
@@ -904,7 +907,8 @@ onMounted(async () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="email in correosJuego" :key="email.correo">
+                <tr v-for="(email, index) in correosJuego" :key="email.correo">
+                  <td>{{ index + 1 }}</td>
                   <td>
                     <div class="font-mono text-sm">{{ email.correo }}</div>
                     <div class="text-xs opacity-50">Código: {{ email.codigo }}</div>
@@ -1096,6 +1100,7 @@ onMounted(async () => {
                 </select>
                 <input v-model="cuenta.nombre" type="text" placeholder="Nombre" class="input input-bordered input-sm w-full" />
                 <input v-model="cuenta.telefono" type="text" placeholder="Teléfono" class="input input-bordered input-sm w-full" />
+                <input v-model.number="cuenta.saldo" type="number" step="0.01" placeholder="Saldo (opcional)" class="input input-bordered input-sm w-full" />
               </div>
             </div>
             <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
@@ -1230,6 +1235,7 @@ onMounted(async () => {
                 </select>
                 <input v-model="cuenta.nombre" type="text" placeholder="Nombre" class="input input-bordered input-sm w-full" />
                 <input v-model="cuenta.telefono" type="text" placeholder="Teléfono" class="input input-bordered input-sm w-full" />
+                <input v-model.number="cuenta.saldo" type="number" step="0.01" placeholder="Saldo (opcional)" class="input input-bordered input-sm w-full" />
               </div>
             </div>
             <div v-else class="text-sm text-base-content opacity-50 p-4 text-center border border-dashed border-base-300 rounded">
@@ -1821,16 +1827,21 @@ onMounted(async () => {
               <h4 class="card-title text-sm">Cuentas ({{ selectedEmailDetails.cuentas.length }})</h4>
               <div class="space-y-2">
                 <div v-for="(cuenta, index) in selectedEmailDetails.cuentas" :key="index" class="flex items-center justify-between bg-base-300 p-3 rounded">
-                  <div>
-                    <span class="badge badge-sm mr-2" :class="{
-                      'badge-primary': cuenta.tipo.includes('Principal'),
-                      'badge-secondary': cuenta.tipo.includes('Secundaria')
-                    }">
-                      {{ cuenta.tipo }}
-                    </span>
-                    <span class="font-medium">{{ cuenta.nombre }}</span>
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="badge badge-sm" :class="{
+                        'badge-primary': cuenta.tipo.includes('Principal'),
+                        'badge-secondary': cuenta.tipo.includes('Secundaria')
+                      }">
+                        {{ cuenta.tipo }}
+                      </span>
+                      <span class="font-medium">{{ cuenta.nombre }}</span>
+                    </div>
+                    <div class="text-xs opacity-70 mt-1">{{ cuenta.telefono }}</div>
                   </div>
-                  <span class="text-sm">{{ cuenta.telefono }}</span>
+                  <div v-if="cuenta.saldo !== undefined" class="text-right">
+                    <div class="badge badge-success">{{ formatearPrecio(cuenta.saldo) }}</div>
+                  </div>
                 </div>
               </div>
             </div>
