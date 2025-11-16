@@ -146,7 +146,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
             :src="logo" 
             alt="Zona Gamers" 
             class="w-30  object-contain"
-            />
+            
             />
           </a>
 
