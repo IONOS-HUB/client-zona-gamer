@@ -17,9 +17,94 @@ import type { GameEmailAccount, GameSummary, GamePlatform, AccountOwner, Telefon
 const games = ref<GameSummary[]>([])
 const gameEmails = ref<GameEmailAccount[]>([])
 const isLoadingGames = ref(false)
+const isSyncingGames = ref(false)
+
+// Constantes para cache
+const CACHE_KEY_PREFIX = 'games_cache_'
+const CACHE_DURATION = 10 * 60 * 1000 // 10 minutos en milisegundos
+
+// Funciones de cache
+const getCacheKey = (plataforma: GamePlatform): string => {
+  return `${CACHE_KEY_PREFIX}${plataforma}`
+}
+
+const getCacheTimestampKey = (plataforma: GamePlatform): string => {
+  return `${CACHE_KEY_PREFIX}${plataforma}_timestamp`
+}
+
+const getCachedGames = (plataforma: GamePlatform): GameSummary[] | null => {
+  try {
+    const cacheKey = getCacheKey(plataforma)
+    const timestampKey = getCacheTimestampKey(plataforma)
+    
+    const cachedData = localStorage.getItem(cacheKey)
+    const cachedTimestamp = localStorage.getItem(timestampKey)
+    
+    if (!cachedData || !cachedTimestamp) {
+      return null
+    }
+    
+    const timestamp = parseInt(cachedTimestamp, 10)
+    const now = Date.now()
+    
+    // Verificar si el cache ha expirado (más de 10 minutos)
+    if (now - timestamp > CACHE_DURATION) {
+      // Cache expirado, limpiar
+      localStorage.removeItem(cacheKey)
+      localStorage.removeItem(timestampKey)
+      return null
+    }
+    
+    return JSON.parse(cachedData) as GameSummary[]
+  } catch (error) {
+    console.error('Error leyendo cache:', error)
+    return null
+  }
+}
+
+const setCachedGames = (plataforma: GamePlatform, gamesData: GameSummary[]): void => {
+  try {
+    const cacheKey = getCacheKey(plataforma)
+    const timestampKey = getCacheTimestampKey(plataforma)
+    
+    localStorage.setItem(cacheKey, JSON.stringify(gamesData))
+    localStorage.setItem(timestampKey, Date.now().toString())
+  } catch (error) {
+    console.error('Error guardando cache:', error)
+  }
+}
+
+const clearCache = (plataforma?: GamePlatform): void => {
+  try {
+    if (plataforma) {
+      const cacheKey = getCacheKey(plataforma)
+      const timestampKey = getCacheTimestampKey(plataforma)
+      localStorage.removeItem(cacheKey)
+      localStorage.removeItem(timestampKey)
+    } else {
+      // Limpiar todo el cache de juegos
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(CACHE_KEY_PREFIX)) {
+          localStorage.removeItem(key)
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Error limpiando cache:', error)
+  }
+}
 
 export function useGames() {
-  const cargarJuegos = async (plataforma: GamePlatform = 'PS4 & PS5'): Promise<void> => {
+  const cargarJuegos = async (plataforma: GamePlatform = 'PS4 & PS5', forceRefresh: boolean = false): Promise<void> => {
+    // Si no es forzado, intentar cargar desde cache primero
+    if (!forceRefresh) {
+      const cachedGames = getCachedGames(plataforma)
+      if (cachedGames && cachedGames.length > 0) {
+        games.value = cachedGames
+        return
+      }
+    }
+    
     isLoadingGames.value = true
     try {
       const plataformaRef = collection(db, 'games', plataforma, 'juegos')
@@ -89,14 +174,33 @@ export function useGames() {
       })
       }
 
-      games.value = Array.from(juegosMap.values()).sort((a, b) => 
+      const sortedGames = Array.from(juegosMap.values()).sort((a, b) => 
         a.nombre.localeCompare(b.nombre)
       )
+      
+      games.value = sortedGames
+      
+      // Guardar en cache
+      setCachedGames(plataforma, sortedGames)
     } catch (error) {
       console.error('Error cargando juegos:', error)
       throw error
     } finally {
       isLoadingGames.value = false
+    }
+  }
+
+  const sincronizarJuegos = async (plataforma: GamePlatform = 'PS4 & PS5'): Promise<void> => {
+    isSyncingGames.value = true
+    try {
+      // Limpiar cache y forzar recarga
+      clearCache(plataforma)
+      await cargarJuegos(plataforma, true)
+    } catch (error) {
+      console.error('Error sincronizando juegos:', error)
+      throw error
+    } finally {
+      isSyncingGames.value = false
     }
   }
 
@@ -174,6 +278,9 @@ export function useGames() {
     datosCorreo: Omit<GameEmailAccount, 'correo' | 'createdAt' | 'updatedAt'>
   ): Promise<void> => {
     try {
+      // Limpiar cache al crear un correo
+      clearCache(plataforma)
+      
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
       const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
 
@@ -221,6 +328,9 @@ export function useGames() {
     datos: Partial<Omit<GameEmailAccount, 'correo' | 'createdAt' | 'updatedAt'>>
   ): Promise<void> => {
     try {
+      // Limpiar cache al actualizar un correo
+      clearCache(plataforma)
+      
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
       const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
 
@@ -263,6 +373,9 @@ export function useGames() {
     correo: string
   ): Promise<void> => {
     try {
+      // Limpiar cache al eliminar un correo
+      clearCache(plataforma)
+      
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
       await deleteDoc(correoRef)
     } catch (error) {
@@ -276,6 +389,9 @@ export function useGames() {
     juegoId: string
   ): Promise<void> => {
     try {
+      // Limpiar cache al eliminar un juego
+      clearCache(plataforma)
+      
       // Primero eliminar todos los correos
       const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
       const correosSnapshot = await getDocs(correosRef)
@@ -300,6 +416,9 @@ export function useGames() {
     version?: GamePlatform
   ): Promise<string> => {
     try {
+      // Limpiar cache al crear un juego
+      clearCache(plataforma)
+      
       const juegoId = generarIdJuego(nombre)
       const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
       
@@ -365,6 +484,9 @@ export function useGames() {
     fotoUrl: string
   ): Promise<void> => {
     try {
+      // Limpiar cache al actualizar foto
+      clearCache(plataforma)
+      
       const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
       await setDoc(juegoRef, { foto: fotoUrl }, { merge: true })
     } catch (error) {
@@ -617,7 +739,9 @@ export function useGames() {
     games,
     gameEmails,
     isLoadingGames,
+    isSyncingGames,
     cargarJuegos,
+    sincronizarJuegos,
     cargarCorreosJuego,
     cargarCorreoPorId,
     crearJuego,
@@ -631,6 +755,7 @@ export function useGames() {
     filtrarJuegosPorPrecio,
     buscarPorTelefono,
     buscarPorCorreo,
-    generarIdJuego
+    generarIdJuego,
+    clearCache
   }
 }

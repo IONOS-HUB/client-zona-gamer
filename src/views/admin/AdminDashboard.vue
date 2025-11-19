@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useRoles } from '@/composables/useRoles'
@@ -8,7 +8,7 @@ import { auth } from '@/config/firebase'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { AppUser, UserRole } from '@/types/user'
-import { BarChart3, Users, Gamepad2, Home, Phone, Search, Mail } from 'lucide-vue-next'
+import { BarChart3, Users, Gamepad2, Home, Phone, Search, Mail, RefreshCw } from 'lucide-vue-next'
 import StatsOverview from '@/components/admin/StatsOverview.vue'
 import { useGames } from '@/composables/useGames'
 import type { TelefonoSearchResult, CorreoSearchResult, GamePlatform, AccountOwner, GameSummary, GameEmailAccount, AccountType } from '@/types/game'
@@ -21,7 +21,9 @@ const {
   buscarPorCorreo,
   games,
   isLoadingGames,
+  isSyncingGames,
   cargarJuegos,
+  sincronizarJuegos,
   cargarCorreosJuego,
   crearJuego,
   actualizarJuego,
@@ -31,7 +33,8 @@ const {
   eliminarJuegoCompleto,
   actualizarFotoJuego,
   buscarJuegos,
-  generarIdJuego
+  generarIdJuego,
+  clearCache
 } = useGames()
 
 // Estado para el tab activo
@@ -592,9 +595,26 @@ const cargarJuegosPorPlataforma = async (): Promise<void> => {
     juegoSeleccionado.value = null
   }
   try {
-    await cargarJuegos('PS4 & PS5')
+    await cargarJuegos(plataformaSeleccionada.value, false) // Usar cache si está disponible
   } catch (error) {
     console.error('Error cargando juegos:', error)
+  }
+}
+
+const handleSincronizarJuegos = async (): Promise<void> => {
+  try {
+    await sincronizarJuegos(plataformaSeleccionada.value)
+    // Mostrar mensaje de éxito
+    createGameSuccess.value = 'Juegos sincronizados exitosamente'
+    setTimeout(() => {
+      createGameSuccess.value = ''
+    }, 3000)
+  } catch (error) {
+    console.error('Error sincronizando juegos:', error)
+    createGameError.value = 'Error al sincronizar juegos'
+    setTimeout(() => {
+      createGameError.value = ''
+    }, 3000)
   }
 }
 
@@ -933,6 +953,7 @@ const handleCreateEmail = async (): Promise<void> => {
     )
 
     createEmailSuccess.value = 'Correo agregado exitosamente'
+    // El cache ya se limpia automáticamente en crearCorreoJuego
     await verCorreosJuego(juegoSeleccionado.value)
 
     setTimeout(() => {
@@ -1008,6 +1029,7 @@ const handleEditEmail = async (): Promise<void> => {
     )
 
     editEmailSuccess.value = 'Correo actualizado exitosamente'
+    // El cache ya se limpia automáticamente en actualizarCorreoJuego
     await verCorreosJuego(juegoSeleccionado.value)
 
     setTimeout(() => {
@@ -1050,6 +1072,7 @@ const handleDeleteGame = async (): Promise<void> => {
         deletingItem.value.data.correo
       )
       deleteGameSuccess.value = 'Correo eliminado exitosamente'
+      // El cache ya se limpia automáticamente en eliminarCorreoJuego
       await verCorreosJuego(juegoSeleccionado.value)
     } else if (deletingItem.value.tipo === 'juego') {
       await eliminarJuegoCompleto(
@@ -1057,6 +1080,7 @@ const handleDeleteGame = async (): Promise<void> => {
         deletingItem.value.data.id
       )
       deleteGameSuccess.value = 'Juego eliminado exitosamente'
+      // El cache ya se limpia automáticamente en eliminarJuegoCompleto
       await cargarJuegosPorPlataforma()
     }
 
@@ -1129,6 +1153,7 @@ const handleCreateGame = async (): Promise<void> => {
     )
 
     createGameSuccess.value = 'Juego creado exitosamente'
+    // El cache ya se limpia automáticamente en crearJuego
     await cargarJuegosPorPlataforma()
 
     setTimeout(() => {
@@ -1189,6 +1214,9 @@ const handleUpdateGame = async (): Promise<void> => {
 
     editGameSuccess.value = 'Juego actualizado exitosamente'
     
+    // El cache ya se limpia automáticamente en actualizarJuego
+    await cargarJuegosPorPlataforma()
+    
     const juegoIndex = games.value.findIndex(j => j.id === editingGame.value?.id)
     if (juegoIndex !== -1) {
       games.value[juegoIndex]!.nombre = editGameName.value.trim()
@@ -1221,9 +1249,52 @@ const cerrarEditarJuego = (): void => {
   editGameError.value = ''
 }
 
+// Intervalo para actualizar automáticamente cada 10 minutos
+let syncInterval: ReturnType<typeof setInterval> | null = null
+
+const iniciarSincronizacionAutomatica = (): void => {
+  // Limpiar intervalo anterior si existe
+  if (syncInterval) {
+    clearInterval(syncInterval)
+  }
+  
+  // Sincronizar cada 10 minutos (600000 ms)
+  syncInterval = setInterval(async () => {
+    if (activeTab.value === 'games' && plataformaSeleccionada.value) {
+      try {
+        await sincronizarJuegos(plataformaSeleccionada.value)
+        console.log('Sincronización automática completada')
+      } catch (error) {
+        console.error('Error en sincronización automática:', error)
+      }
+    }
+  }, 10 * 60 * 1000) // 10 minutos
+}
+
+const detenerSincronizacionAutomatica = (): void => {
+  if (syncInterval) {
+    clearInterval(syncInterval)
+    syncInterval = null
+  }
+}
+
 // Watcher para cargar juegos cuando se cambia al tab de juegos
 watch(activeTab, async (newTab) => {
-  if (newTab === 'games' && games.value.length === 0) {
+  if (newTab === 'games') {
+    if (games.value.length === 0) {
+      await cargarJuegosPorPlataforma()
+    }
+    // Iniciar sincronización automática cuando se entra al tab de juegos
+    iniciarSincronizacionAutomatica()
+  } else {
+    // Detener sincronización automática cuando se sale del tab de juegos
+    detenerSincronizacionAutomatica()
+  }
+})
+
+// Watcher para sincronizar cuando cambia la plataforma
+watch(plataformaSeleccionada, async () => {
+  if (activeTab.value === 'games') {
     await cargarJuegosPorPlataforma()
   }
 })
@@ -1248,7 +1319,13 @@ onMounted(async () => {
     }, 100)
   } else if (activeTab.value === 'games') {
     await cargarJuegosPorPlataforma()
+    iniciarSincronizacionAutomatica()
   }
+})
+
+// Limpiar intervalos al desmontar el componente
+onBeforeUnmount(() => {
+  detenerSincronizacionAutomatica()
 })
 </script>
 
@@ -1806,12 +1883,22 @@ onMounted(async () => {
         </div>
 
         <!-- Botones de acción -->
-        <div v-if="isAdmin && vistaActual === 'juegos'" class="flex gap-2 mb-4">
+        <div v-if="vistaActual === 'juegos'" class="flex gap-2 mb-4">
           <button 
+            v-if="isAdmin"
             class="btn btn-primary"
             @click="iniciarCreacionJuego"
           >
             + Crear Juego
+          </button>
+          <button 
+            class="btn btn-outline btn-primary gap-2"
+            @click="handleSincronizarJuegos"
+            :disabled="isSyncingGames || isLoadingGames"
+            title="Sincronizar con la base de datos"
+          >
+            <RefreshCw :size="18" :class="{ 'animate-spin': isSyncingGames }" />
+            {{ isSyncingGames ? 'Sincronizando...' : 'Sincronizar' }}
           </button>
         </div>
         

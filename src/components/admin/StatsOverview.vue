@@ -15,7 +15,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const router = useRouter()
-const { games, cargarJuegos, buscarPorTelefono } = useGames()
+const { games, cargarJuegos, sincronizarJuegos, buscarPorTelefono, isSyncingGames } = useGames()
 
 // Estados de filtros
 const plataformaFiltro = ref<GamePlatform>('PS4 & PS5')
@@ -30,7 +30,15 @@ const isLoadingTelefono = ref(false)
 
 // Cargar juegos
 const cargarDatos = async () => {
-  await cargarJuegos('PS4 & PS5')
+  await cargarJuegos('PS4 & PS5', false) // Usar cache si está disponible
+}
+
+const handleSincronizar = async (): Promise<void> => {
+  try {
+    await sincronizarJuegos(plataformaFiltro.value)
+  } catch (error) {
+    console.error('Error sincronizando:', error)
+  }
 }
 
 onMounted(() => {
@@ -219,12 +227,24 @@ const verDetallesJuego = (juego: GameSummary): void => {
           {{ readOnly ? 'Vista de solo lectura' : 'Vista completa con filtros avanzados' }}
         </p>
       </div>
-      <button 
-        @click="cargarDatos" 
-        class="btn btn-circle btn-ghost"
-      >
-        <RefreshCw :size="20" />
-      </button>
+      <div class="flex gap-2">
+        <button 
+          @click="cargarDatos" 
+          class="btn btn-circle btn-ghost"
+          title="Recargar desde cache"
+        >
+          <RefreshCw :size="20" />
+        </button>
+        <button 
+          @click="handleSincronizar" 
+          class="btn btn-outline btn-primary gap-2"
+          :disabled="isSyncingGames"
+          title="Sincronizar con la base de datos"
+        >
+          <RefreshCw :size="18" :class="{ 'animate-spin': isSyncingGames }" />
+          {{ isSyncingGames ? 'Sincronizando...' : 'Sincronizar' }}
+        </button>
+      </div>
     </div>
 
     <!-- Cards de Estadísticas Principales -->
