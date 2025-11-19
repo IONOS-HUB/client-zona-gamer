@@ -66,3 +66,14 @@ export interface GameFilters {
   busqueda?: string
 }
 
+export interface TelefonoSearchResult {
+  juego: GameSummary
+  correo: GameEmailAccount
+  cuenta: AccountOwner
+}
+
+export interface CorreoSearchResult {
+  juego: GameSummary
+  correo: GameEmailAccount
+}
+

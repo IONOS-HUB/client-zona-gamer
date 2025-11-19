@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useRoles } from '@/composables/useRoles'
 import { useGames } from '@/composables/useGames'
-import type { GameSummary, GameEmailAccount, GamePlatform, AccountOwner, AccountType } from '@/types/game'
+import type { GameSummary, GameEmailAccount, GamePlatform, AccountOwner, AccountType, TelefonoSearchResult, CorreoSearchResult } from '@/types/game'
+import { Phone, Search, Mail } from 'lucide-vue-next'
 
 const router = useRouter()
 const { signOut } = useAuth()
@@ -22,16 +23,31 @@ const {
   eliminarJuegoCompleto,
   actualizarFotoJuego,
   buscarJuegos,
+  buscarPorTelefono,
+  buscarPorCorreo,
   generarIdJuego
 } = useGames()
 
 // Estado general
 const plataformaSeleccionada = ref<GamePlatform>('PS4 & PS5')
 const searchTerm = ref('')
-const vistaActual = ref<'juegos' | 'correos'>('juegos')
+const vistaActual = ref<'juegos' | 'correos' | 'telefono'>('juegos')
 const juegoSeleccionado = ref<GameSummary | null>(null)
 const correosJuego = ref<GameEmailAccount[]>([])
 const isLoadingCorreos = ref(false)
+
+// Estados para búsqueda por teléfono
+const telefonoBusqueda = ref('')
+const resultadosTelefono = ref<TelefonoSearchResult[]>([])
+const isLoadingTelefono = ref(false)
+
+// Estados para búsqueda por correo
+const correoBusqueda = ref('')
+const resultadosCorreo = ref<CorreoSearchResult[]>([])
+const isLoadingCorreo = ref(false)
+
+// Estado para búsqueda de correos
+const searchTermCorreos = ref('')
 
 // Estados para crear correo
 const showCreateEmail = ref(false)
@@ -102,6 +118,12 @@ const createGameError = ref('')
 const createGameSuccess = ref('')
 
 
+// Estados para filtros adicionales
+const sortBy = ref<'nombre' | 'costo' | 'correos' | 'stock'>('nombre')
+const sortOrder = ref<'asc' | 'desc'>('asc')
+const stockFiltro = ref<'todas' | 'con' | 'sin'>('todas')
+const promoFiltro = ref<'todas' | 'oferta' | 'promocion' | 'ninguna'>('todas')
+
 const juegosFiltrados = computed(() => {
   // Primero filtrar por plataforma según el campo 'version' de cada juego
   let juegosPorPlataforma = games.value.filter(juego => {
@@ -120,24 +142,111 @@ const juegosFiltrados = computed(() => {
     return true
   })
   
-  // Luego filtrar por término de búsqueda si existe
-  if (!searchTerm.value) return juegosPorPlataforma
+  // Filtrar por término de búsqueda si existe
+  if (searchTerm.value) {
+    const resultadosBusqueda = buscarJuegos(searchTerm.value)
+    juegosPorPlataforma = juegosPorPlataforma.filter(juego => {
+      return resultadosBusqueda.some(j => j.id === juego.id)
+    })
+  }
+
+  // Filtro por promoción
+  if (promoFiltro.value !== 'todas') {
+    juegosPorPlataforma = juegosPorPlataforma.filter(juego => {
+      if (promoFiltro.value === 'oferta') {
+        return juego.tipoPromocion === 'oferta' || juego.isOffert
+      } else if (promoFiltro.value === 'promocion') {
+        return juego.tipoPromocion === 'promocion'
+      } else if (promoFiltro.value === 'ninguna') {
+        return juego.tipoPromocion === 'ninguna' || (!juego.tipoPromocion && !juego.isOffert)
+      }
+      return true
+    })
+  }
+
+  // Filtro por stock
+  if (stockFiltro.value !== 'todas') {
+    juegosPorPlataforma = juegosPorPlataforma.filter(juego => {
+      const stock = juego.stockAccounts ?? 0
+      if (stockFiltro.value === 'con') {
+        return stock > 0
+      }
+      if (stockFiltro.value === 'sin') {
+        return stock === 0
+      }
+      return true
+    })
+  }
+
+  // Ordenamiento
+  const resultadoOrdenado = [...juegosPorPlataforma].sort((a, b) => {
+    let compareValue = 0
+    
+    switch (sortBy.value) {
+      case 'nombre':
+        compareValue = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+        break
+      case 'costo':
+        compareValue = a.costo - b.costo
+        break
+      case 'correos':
+        compareValue = a.totalCorreos - b.totalCorreos
+        break
+      case 'stock':
+        compareValue = (a.stockAccounts || 0) - (b.stockAccounts || 0)
+        break
+    }
+
+    return sortOrder.value === 'asc' ? compareValue : -compareValue
+  })
+
+  return resultadoOrdenado
+})
+
+// Filtrar correos según término de búsqueda
+const correosFiltrados = computed(() => {
+  if (!searchTermCorreos.value || searchTermCorreos.value.trim() === '') {
+    return correosJuego.value
+  }
+
+  const termino = searchTermCorreos.value.toLowerCase().trim()
   
-  // Aplicar búsqueda y mantener el filtro de plataforma
-  const resultadosBusqueda = buscarJuegos(searchTerm.value)
-  return resultadosBusqueda.filter(juego => {
-    // Verificar que el juego esté en la lista filtrada por plataforma
-    return juegosPorPlataforma.some(j => j.id === juego.id)
+  return correosJuego.value.filter(correo => {
+    // Buscar en el correo
+    if (correo.correo.toLowerCase().includes(termino)) return true
+    
+    // Buscar en el código
+    if (correo.codigo.toLowerCase().includes(termino)) return true
+    
+    // Buscar en el nombre del juego
+    if (correo.nombre.toLowerCase().includes(termino)) return true
+    
+    // Buscar en códigos generados
+    if (correo.codigosGenerados.some(codigo => codigo.toLowerCase().includes(termino))) return true
+    
+    // Buscar en código master
+    if (correo.codigoMaster.toLowerCase().includes(termino)) return true
+    
+    // Buscar en nombres de cuentas
+    if (correo.cuentas.some(cuenta => cuenta.nombre.toLowerCase().includes(termino))) return true
+    
+    // Buscar en teléfonos de cuentas
+    if (correo.cuentas.some(cuenta => cuenta.telefono.toLowerCase().includes(termino))) return true
+    
+    return false
   })
 })
 
 const cargarJuegosPorPlataforma = async (): Promise<void> => {
-  vistaActual.value = 'juegos'
-  juegoSeleccionado.value = null
+  // Solo cambiar vista si no estamos en correos o teléfono
+  if (vistaActual.value === 'juegos') {
+    juegoSeleccionado.value = null
+  }
   try {
     // Todos los juegos están en la colección PS4 & PS5
     // Cargamos todos y luego filtramos por el campo 'version' de cada juego
     await cargarJuegos('PS4 & PS5')
+    // Los filtros se aplicarán automáticamente porque juegosFiltrados es un computed
   } catch (error) {
     console.error('Error cargando juegos:', error)
   }
@@ -162,6 +271,11 @@ const volverAJuegos = (): void => {
   vistaActual.value = 'juegos'
   juegoSeleccionado.value = null
   correosJuego.value = []
+  searchTermCorreos.value = '' // Limpiar búsqueda de correos al volver
+  correoBusqueda.value = '' // Limpiar búsqueda por correo al volver
+  resultadosCorreo.value = [] // Limpiar resultados de correo
+  // Los filtros de juegos se mantienen automáticamente porque están en refs reactivos
+  // No es necesario limpiarlos - se aplicarán automáticamente al cambiar la vista
 }
 
 const formatearFecha = (fecha: Date | string): string => {
@@ -776,6 +890,65 @@ const volverAlPanel = (): void => {
   }
 }
 
+const buscarTelefono = async (): Promise<void> => {
+  if (!telefonoBusqueda.value || telefonoBusqueda.value.trim().length < 3) {
+    resultadosTelefono.value = []
+    return
+  }
+
+  isLoadingTelefono.value = true
+  // Si estamos en vista de juegos, mantener la vista pero mostrar resultados
+  // Si estamos en otra vista, cambiar a vista de teléfono
+  if (vistaActual.value !== 'juegos') {
+    vistaActual.value = 'telefono'
+  }
+  try {
+    resultadosTelefono.value = await buscarPorTelefono(telefonoBusqueda.value.trim(), plataformaSeleccionada.value)
+  } catch (error) {
+    console.error('Error buscando teléfono:', error)
+  } finally {
+    isLoadingTelefono.value = false
+  }
+}
+
+// Debounce manual para optimizar búsquedas
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+const buscarTelefonoDebounced = (): void => {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+  }
+  debounceTimer = setTimeout(() => {
+    buscarTelefono()
+  }, 500)
+}
+
+const buscarCorreo = async (): Promise<void> => {
+  if (!correoBusqueda.value || correoBusqueda.value.trim().length < 3) {
+    resultadosCorreo.value = []
+    return
+  }
+
+  isLoadingCorreo.value = true
+  try {
+    resultadosCorreo.value = await buscarPorCorreo(correoBusqueda.value.trim(), plataformaSeleccionada.value)
+  } catch (error) {
+    console.error('Error buscando correo:', error)
+  } finally {
+    isLoadingCorreo.value = false
+  }
+}
+
+// Debounce manual para búsqueda de correos
+let debounceTimerCorreo: ReturnType<typeof setTimeout> | null = null
+const buscarCorreoDebounced = (): void => {
+  if (debounceTimerCorreo) {
+    clearTimeout(debounceTimerCorreo)
+  }
+  debounceTimerCorreo = setTimeout(() => {
+    buscarCorreo()
+  }, 500)
+}
+
 onMounted(async () => {
   await loadUserData()
   
@@ -841,44 +1014,179 @@ onMounted(async () => {
       </div>
 
       <!-- Controles superiores -->
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div class="flex items-center gap-4">
-          <select 
-            v-model="plataformaSeleccionada" 
-            class="select select-bordered"
-            @change="cargarJuegosPorPlataforma"
-            :disabled="vistaActual === 'correos'"
-          >
-            <option value="PS4 & PS5">PS4 & PS5</option>
-            <option value="PS4">PS4</option>
-            <option value="PS5">PS5</option>
-          </select>
+      <div class="space-y-4 mb-6">
+        <!-- Primera fila: Búsquedas y plataforma -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div class="flex items-center gap-4 flex-wrap flex-1">
+            <select 
+              v-model="plataformaSeleccionada" 
+              class="select select-bordered"
+              @change="cargarJuegosPorPlataforma"
+              :disabled="vistaActual === 'correos' || vistaActual === 'telefono'"
+            >
+              <option value="PS4 & PS5">PS4 & PS5</option>
+              <option value="PS4">PS4</option>
+              <option value="PS5">PS5</option>
+            </select>
 
-          <input
-            v-if="vistaActual === 'juegos'"
-            v-model="searchTerm"
-            type="text"
-            placeholder="Buscar juego..."
-            class="input input-bordered w-full max-w-xs"
-          />
+            <div v-if="vistaActual === 'juegos'" class="form-control">
+              <div class="relative">
+                <input
+                  v-model="searchTerm"
+                  type="text"
+                  placeholder="Buscar juego por nombre..."
+                  class="input input-bordered w-full max-w-xs pl-10"
+                  autocomplete="off"
+                />
+                <Search :size="18" class="absolute left-3 top-3 text-base-content/40" />
+              </div>
+            </div>
+
+            <div v-if="vistaActual === 'juegos' || vistaActual === 'correos'" class="form-control">
+              <div class="relative">
+                <input
+                  v-model="telefonoBusqueda"
+                  type="text"
+                  placeholder="Buscar por teléfono..."
+                  class="input input-bordered w-full max-w-xs pl-10"
+                  @keyup.enter="buscarTelefono"
+                  autocomplete="off"
+                />
+                <Phone :size="18" class="absolute left-3 top-3 text-base-content/40" />
+              </div>
+              <button 
+                v-if="telefonoBusqueda && telefonoBusqueda.trim().length >= 3"
+                @click="buscarTelefono" 
+                class="btn btn-sm btn-primary btn-block mt-1"
+                :disabled="isLoadingTelefono"
+              >
+                {{ isLoadingTelefono ? 'Buscando...' : 'Buscar Teléfono' }}
+              </button>
+            </div>
+            <div v-if="vistaActual === 'juegos' || vistaActual === 'correos'" class="form-control">
+              <div class="relative">
+                <input
+                  v-model="correoBusqueda"
+                  type="email"
+                  placeholder="Buscar por correo..."
+                  class="input input-bordered w-full max-w-xs pl-10"
+                  @keyup.enter="buscarCorreo"
+                  autocomplete="off"
+                />
+                <Mail :size="18" class="absolute left-3 top-3 text-base-content/40" />
+              </div>
+              <button 
+                v-if="correoBusqueda && correoBusqueda.trim().length >= 3"
+                @click="buscarCorreo" 
+                class="btn btn-sm btn-primary btn-block mt-1"
+                :disabled="isLoadingCorreo"
+              >
+                {{ isLoadingCorreo ? 'Buscando...' : 'Buscar Correo' }}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div v-if="isAdmin" class="flex gap-2">
-          <button 
-            v-if="vistaActual === 'juegos'" 
-            class="btn btn-primary"
-            @click="iniciarCreacionJuego"
-          >
-            + Crear Juego
-          </button>
-          <button 
-            v-if="vistaActual === 'correos'" 
-            class="btn btn-primary"
-            @click="iniciarCreacion"
-          >
-            + Agregar Correo
-          </button>
+        <!-- Segunda fila: Filtros avanzados -->
+        <div v-if="vistaActual === 'juegos'" class="card bg-base-100 shadow-lg">
+          <div class="card-body p-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <!-- Filtro Promoción -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold text-sm">Promoción</span>
+                </label>
+                <select v-model="promoFiltro" class="select select-bordered select-sm">
+                  <option value="todas">Todas</option>
+                  <option value="oferta">En Oferta</option>
+                  <option value="promocion">En Promoción</option>
+                  <option value="ninguna">Sin Promoción</option>
+                </select>
+              </div>
+
+              <!-- Filtro Stock -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold text-sm">Stock</span>
+                </label>
+                <select v-model="stockFiltro" class="select select-bordered select-sm">
+                  <option value="todas">Todos</option>
+                  <option value="con">Con stock</option>
+                  <option value="sin">Sin stock</option>
+                </select>
+              </div>
+
+              <!-- Ordenar Por -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold text-sm">Ordenar Por</span>
+                </label>
+                <div class="join w-full">
+                  <select v-model="sortBy" class="select select-bordered select-sm join-item flex-1">
+                    <option value="nombre">Nombre (A-Z)</option>
+                    <option value="costo">Precio</option>
+                    <option value="correos">Cuentas</option>
+                    <option value="stock">Stock</option>
+                  </select>
+                  <button 
+                    @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'" 
+                    class="btn btn-square btn-sm join-item"
+                    :class="sortOrder === 'asc' ? 'btn-primary' : 'btn-secondary'"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path 
+                        v-if="sortOrder === 'asc'"
+                        stroke-linecap="round" 
+                        stroke-linejoin="round" 
+                        stroke-width="2" 
+                        d="M5 15l7-7 7 7" 
+                      />
+                      <path 
+                        v-else
+                        stroke-linecap="round" 
+                        stroke-linejoin="round" 
+                        stroke-width="2" 
+                        d="M19 9l-7 7-7-7" 
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Botón Limpiar Filtros -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold text-sm opacity-0">Acción</span>
+                </label>
+                <button 
+                  @click="searchTerm = ''; promoFiltro = 'todas'; stockFiltro = 'todas'; sortBy = 'nombre'; sortOrder = 'asc'" 
+                  class="btn btn-sm btn-ghost w-full"
+                >
+                  Limpiar Filtros
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Botones de acción -->
+      <div v-if="isAdmin && vistaActual === 'juegos'" class="flex gap-2 mb-4">
+        <button 
+          class="btn btn-primary"
+          @click="iniciarCreacionJuego"
+        >
+          + Crear Juego
+        </button>
+      </div>
+      
+      <div v-if="isAdmin && vistaActual === 'correos'" class="flex gap-2 mb-4">
+        <button 
+          class="btn btn-primary"
+          @click="iniciarCreacion"
+        >
+          + Agregar Correo
+        </button>
       </div>
 
       <!-- Mensajes -->
@@ -890,20 +1198,138 @@ onMounted(async () => {
         <span>{{ deleteError || editGameError || createGameError }}</span>
       </div>
 
+      <!-- Resultados de Búsqueda por Teléfono (en vista de juegos) -->
+      <div v-if="vistaActual === 'juegos' && resultadosTelefono.length > 0" class="card bg-base-100 shadow-xl mb-4">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="card-title text-lg flex items-center gap-2">
+              <Phone :size="20" />
+              Resultados de Búsqueda por Teléfono ({{ resultadosTelefono.length }})
+            </h3>
+            <button @click="telefonoBusqueda = ''; resultadosTelefono = []" class="btn btn-sm btn-ghost">
+              ✕ Cerrar
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div v-for="(resultado, index) in resultadosTelefono" :key="index" class="card bg-base-200 shadow">
+              <div class="card-body p-3">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-semibold text-sm">{{ resultado.cuenta.nombre }}</h4>
+                    <p class="text-xs text-base-content/60 mt-1">
+                      <Phone :size="12" class="inline mr-1" />
+                      {{ resultado.cuenta.telefono }}
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-1">
+                      <span class="badge badge-xs">{{ resultado.juego.nombre }}</span>
+                      <span class="badge badge-xs badge-outline">{{ formatearPrecio(resultado.juego.costo) }}</span>
+                      <span v-if="resultado.cuenta.hasStock" class="badge badge-xs badge-primary">Stock</span>
+                    </div>
+                  </div>
+                  <div class="badge badge-sm ml-2" :class="{
+                    'badge-primary': resultado.cuenta.tipo.includes('Principal'),
+                    'badge-secondary': resultado.cuenta.tipo.includes('Secundaria')
+                  }">
+                    {{ resultado.cuenta.tipo }}
+                  </div>
+                </div>
+                <button 
+                  @click="verCorreosJuego(resultado.juego)"
+                  class="btn btn-xs btn-ghost mt-2 w-full"
+                >
+                  Ver correos →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resultados de Búsqueda por Correo (en vista de juegos) -->
+      <div v-if="vistaActual === 'juegos' && resultadosCorreo.length > 0" class="card bg-base-100 shadow-xl mb-4">
+        <div class="card-body">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="card-title text-lg flex items-center gap-2">
+              <Mail :size="20" />
+              Resultados de Búsqueda por Correo ({{ resultadosCorreo.length }})
+            </h3>
+            <button @click="correoBusqueda = ''; resultadosCorreo = []" class="btn btn-sm btn-ghost">
+              ✕ Cerrar
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div v-for="(resultado, index) in resultadosCorreo" :key="index" class="card bg-base-200 shadow">
+              <div class="card-body p-3">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-semibold text-sm flex items-center gap-2">
+                      <Mail :size="14" />
+                      {{ resultado.correo.correo }}
+                    </h4>
+                    <p class="text-xs text-base-content/60 mt-1">
+                      Código: {{ resultado.correo.codigo }}
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-1">
+                      <span class="badge badge-xs">{{ resultado.juego.nombre }}</span>
+                      <span class="badge badge-xs badge-outline">{{ formatearPrecio(resultado.juego.costo) }}</span>
+                      <span class="badge badge-xs">{{ resultado.correo.cuentas.length }} cuenta{{ resultado.correo.cuentas.length !== 1 ? 's' : '' }}</span>
+                      <span v-if="contarStockCuentas(resultado.correo.cuentas) > 0" class="badge badge-xs badge-primary">
+                        Stock: {{ contarStockCuentas(resultado.correo.cuentas) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  @click="verCorreosJuego(resultado.juego)"
+                  class="btn btn-xs btn-ghost mt-2 w-full"
+                >
+                  Ver correos →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Vista de Juegos -->
       <div v-if="vistaActual === 'juegos'" class="card bg-base-100 shadow-xl">
         <div class="card-body">
-          <h2 class="card-title">
-            Juegos de {{ plataformaSeleccionada }}
-            <span class="badge badge-lg">{{ juegosFiltrados.length }}</span>
-          </h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="card-title">
+              Juegos de {{ plataformaSeleccionada }}
+              <span class="badge badge-lg">{{ juegosFiltrados.length }}</span>
+              <span v-if="games.length !== juegosFiltrados.length" class="badge badge-outline badge-sm">
+                de {{ games.length }} total
+              </span>
+            </h2>
+            <div v-if="searchTerm || promoFiltro !== 'todas' || stockFiltro !== 'todas'" class="flex gap-2 items-center">
+              <span class="text-sm text-base-content/60">Filtros activos</span>
+              <button 
+                @click="searchTerm = ''; promoFiltro = 'todas'; stockFiltro = 'todas'; sortBy = 'nombre'; sortOrder = 'asc'"
+                class="btn btn-xs btn-ghost"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
 
           <div v-if="isLoadingGames" class="flex justify-center p-8">
             <span class="loading loading-spinner loading-lg"></span>
           </div>
 
           <div v-else-if="juegosFiltrados.length === 0" class="text-center p-8">
-            <p class="text-gray-500">No hay juegos registrados</p>
+            <p class="text-gray-500">
+              {{ searchTerm || promoFiltro !== 'todas' || stockFiltro !== 'todas' 
+                ? 'No se encontraron juegos con los filtros aplicados' 
+                : 'No hay juegos registrados' }}
+            </p>
+            <button 
+              v-if="searchTerm || promoFiltro !== 'todas' || stockFiltro !== 'todas'"
+              @click="searchTerm = ''; promoFiltro = 'todas'; stockFiltro = 'todas'; sortBy = 'nombre'; sortOrder = 'asc'"
+              class="btn btn-sm btn-ghost mt-4"
+            >
+              Limpiar filtros
+            </button>
           </div>
 
           <div v-else class="overflow-x-auto">
@@ -997,17 +1423,179 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Vista de Búsqueda por Teléfono -->
+      <div v-if="vistaActual === 'telefono'" class="space-y-4">
+        <div class="card bg-base-100 shadow-xl">
+          <div class="card-body">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="card-title text-xl flex items-center gap-2">
+                <Phone :size="24" />
+                Búsqueda por Teléfono
+              </h2>
+              <button class="btn btn-sm btn-ghost" @click="volverAJuegos">
+                ← Volver a juegos
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div class="form-control md:col-span-2">
+                <label class="label">
+                  <span class="label-text font-semibold">Número de Teléfono</span>
+                </label>
+                <div class="relative">
+                  <input
+                    v-model="telefonoBusqueda"
+                    type="text"
+                    placeholder="Ej: +593 99 358 6097 o 993586097"
+                    class="input input-bordered w-full pl-10"
+                    @keyup.enter="buscarTelefono"
+                    autocomplete="off"
+                  />
+                  <Phone :size="20" class="absolute left-3 top-3 text-base-content/40" />
+                </div>
+              </div>
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Plataforma</span>
+                </label>
+                <select v-model="plataformaSeleccionada" class="select select-bordered">
+                  <option value="PS4 & PS5">PS4 & PS5</option>
+                  <option value="PS4">PS4</option>
+                  <option value="PS5">PS5</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-actions justify-end">
+              <button 
+                @click="buscarTelefono" 
+                class="btn btn-primary gap-2"
+                :disabled="isLoadingTelefono || !telefonoBusqueda || telefonoBusqueda.trim().length < 3"
+              >
+                <Search :size="18" />
+                {{ isLoadingTelefono ? 'Buscando...' : 'Buscar' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resultados -->
+        <div v-if="isLoadingTelefono" class="flex justify-center p-8">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+
+        <div v-else-if="resultadosTelefono.length === 0 && telefonoBusqueda && telefonoBusqueda.trim().length >= 3" class="card bg-base-100 shadow-xl">
+          <div class="card-body text-center">
+            <p class="text-base-content/60">No se encontraron cuentas con ese número de teléfono</p>
+          </div>
+        </div>
+
+        <div v-else-if="resultadosTelefono.length > 0" class="space-y-4">
+          <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+              <h2 class="card-title">
+                Resultados encontrados ({{ resultadosTelefono.length }})
+              </h2>
+            </div>
+          </div>
+
+          <div v-for="(resultado, index) in resultadosTelefono" :key="index" class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+              <div class="flex justify-between items-start mb-4">
+                <div>
+                  <h3 class="card-title text-lg">{{ resultado.cuenta.nombre }}</h3>
+                  <p class="text-base-content/60 mt-1">
+                    <Phone :size="16" class="inline mr-1" />
+                    {{ resultado.cuenta.telefono }}
+                  </p>
+                </div>
+                <div class="badge badge-lg" :class="{
+                  'badge-primary': resultado.cuenta.tipo.includes('Principal'),
+                  'badge-secondary': resultado.cuenta.tipo.includes('Secundaria')
+                }">
+                  {{ resultado.cuenta.tipo }}
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 class="font-semibold mb-2">Información del Juego</h4>
+                  <div class="space-y-1 text-sm">
+                    <p><span class="font-medium">Juego:</span> {{ resultado.juego.nombre }}</p>
+                    <p><span class="font-medium">Precio:</span> {{ formatearPrecio(resultado.juego.costo) }}</p>
+                    <p><span class="font-medium">Versión:</span> {{ resultado.juego.version }}</p>
+                    <button 
+                      @click="verCorreosJuego(resultado.juego)"
+                      class="btn btn-sm btn-ghost mt-2"
+                    >
+                      Ver correos del juego →
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <h4 class="font-semibold mb-2">Información del Correo</h4>
+                  <div class="space-y-1 text-sm">
+                    <p><span class="font-medium">Correo:</span> <span class="font-mono text-xs">{{ resultado.correo.correo }}</span></p>
+                    <p><span class="font-medium">Fecha:</span> {{ formatearFecha(resultado.correo.fecha) }}</p>
+                    <p><span class="font-medium">Código:</span> {{ resultado.correo.codigo }}</p>
+                    <p v-if="resultado.cuenta.saldo !== undefined">
+                      <span class="font-medium">Saldo de la cuenta:</span> 
+                      <span class="badge badge-success">{{ formatearPrecio(resultado.cuenta.saldo) }}</span>
+                    </p>
+                    <p v-if="resultado.cuenta.hasStock">
+                      <span class="badge badge-primary badge-sm">Cuenta con Stock</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Vista de Correos -->
       <div v-if="vistaActual === 'correos'" class="card bg-base-100 shadow-xl">
         <div class="card-body">
-          <div class="flex justify-between items-center">
-            <h2 class="card-title">
-              Correos de {{ juegoSeleccionado?.nombre }}
-              <span class="badge badge-lg">{{ correosJuego.length }}</span>
-            </h2>
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+            <div>
+              <h2 class="card-title">
+                Correos de {{ juegoSeleccionado?.nombre }}
+                <span class="badge badge-lg">{{ correosFiltrados.length }}</span>
+                <span v-if="correosJuego.length !== correosFiltrados.length" class="badge badge-outline badge-sm">
+                  de {{ correosJuego.length }} total
+                </span>
+              </h2>
+            </div>
             <button class="btn btn-sm btn-ghost" @click="volverAJuegos">
               ← Volver a juegos
             </button>
+          </div>
+
+          <!-- Buscador de Correos -->
+          <div class="mb-4">
+            <div class="form-control">
+              <div class="relative">
+                <input
+                  v-model="searchTermCorreos"
+                  type="text"
+                  placeholder="Buscar correos por email, código, nombre, teléfono..."
+                  class="input input-bordered w-full pl-10"
+                  autocomplete="off"
+                />
+                <Search :size="18" class="absolute left-3 top-3 text-base-content/40" />
+              </div>
+              <label class="label">
+                <span class="label-text-alt">Busca en correos, códigos, nombres de cuentas y teléfonos</span>
+                <button 
+                  v-if="searchTermCorreos"
+                  @click="searchTermCorreos = ''"
+                  class="btn btn-xs btn-ghost"
+                >
+                  Limpiar
+                </button>
+              </label>
+            </div>
           </div>
 
           <div v-if="isLoadingCorreos" class="flex justify-center p-8">
@@ -1016,6 +1604,16 @@ onMounted(async () => {
 
           <div v-else-if="correosJuego.length === 0" class="text-center p-8">
             <p class="text-gray-500">No hay correos registrados para este juego</p>
+          </div>
+
+          <div v-else-if="correosFiltrados.length === 0 && searchTermCorreos" class="text-center p-8">
+            <p class="text-gray-500">No se encontraron correos con el término de búsqueda "{{ searchTermCorreos }}"</p>
+            <button 
+              @click="searchTermCorreos = ''"
+              class="btn btn-sm btn-ghost mt-2"
+            >
+              Limpiar búsqueda
+            </button>
           </div>
 
           <div v-else class="overflow-x-auto">
@@ -1032,7 +1630,7 @@ onMounted(async () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(email, index) in correosJuego" :key="email.correo">
+                <tr v-for="(email, index) in correosFiltrados" :key="email.correo">
                   <td>{{ index + 1 }}</td>
                   <td>
                     <div class="font-mono text-sm">{{ email.correo }}</div>
@@ -1090,7 +1688,9 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    </div>
 
+    <!-- Modales -->
     <!-- Modal para agregar correo -->
     <dialog :class="['modal', { 'modal-open': showCreateEmail }]">
       <div class="modal-box max-w-4xl">
@@ -2038,5 +2638,5 @@ onMounted(async () => {
         <button @click="cerrarDetalles">close</button>
       </form>
     </dialog>
-  </div>
+
 </template>

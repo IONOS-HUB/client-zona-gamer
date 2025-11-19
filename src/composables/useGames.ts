@@ -12,7 +12,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import type { GameEmailAccount, GameSummary, GamePlatform, AccountOwner } from '@/types/game'
+import type { GameEmailAccount, GameSummary, GamePlatform, AccountOwner, TelefonoSearchResult, CorreoSearchResult } from '@/types/game'
 
 const games = ref<GameSummary[]>([])
 const gameEmails = ref<GameEmailAccount[]>([])
@@ -402,6 +402,217 @@ export function useGames() {
     })
   }
 
+  const buscarPorTelefono = async (
+    telefono: string,
+    plataforma: GamePlatform = 'PS4 & PS5'
+  ): Promise<TelefonoSearchResult[]> => {
+    if (!telefono || telefono.trim().length < 3) {
+      return []
+    }
+
+    try {
+      const resultados: TelefonoSearchResult[] = []
+      
+      // Normalizar teléfono de búsqueda: eliminar espacios, mantener números y +
+      const telefonoInput = telefono.trim()
+      const telefonoNormalizado = telefonoInput.replace(/\s+/g, '').toLowerCase()
+      // Extraer solo los números (sin el +593 si está presente)
+      const numerosBusqueda = telefonoNormalizado.replace(/[^\d]/g, '')
+      
+      // Cargar todos los juegos de la plataforma
+      const plataformaRef = collection(db, 'games', plataforma, 'juegos')
+      const querySnapshot = await getDocs(plataformaRef)
+
+      // Iterar sobre cada juego
+      for (const juegoDoc of querySnapshot.docs) {
+        const juegoId = juegoDoc.id
+        const juegoDocData = juegoDoc.data()
+
+        // Obtener todos los correos del juego
+        const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
+        const correosSnapshot = await getDocs(correosRef)
+
+        // Buscar en cada correo
+        for (const correoDoc of correosSnapshot.docs) {
+          const correoData = correoDoc.data()
+          const cuentas = correoData.cuentas || []
+
+          // Buscar en las cuentas del correo
+          for (const cuenta of cuentas) {
+            if (cuenta?.telefono) {
+              // Normalizar teléfono de la cuenta de la misma manera
+              const telefonoCuentaNormalizado = cuenta.telefono.replace(/\s+/g, '').toLowerCase()
+              const numerosCuenta = telefonoCuentaNormalizado.replace(/[^\d]/g, '')
+              
+              // Buscar coincidencias:
+              // 1. Coincidencia exacta normalizada
+              // 2. Los números de búsqueda están contenidos en los números de la cuenta
+              // 3. Los números de la cuenta están contenidos en los números de búsqueda
+              // 4. Coincidencia parcial (al menos 6 dígitos coinciden)
+              const coincide = 
+                telefonoCuentaNormalizado === telefonoNormalizado ||
+                telefonoCuentaNormalizado.includes(telefonoNormalizado) ||
+                telefonoNormalizado.includes(telefonoCuentaNormalizado) ||
+                numerosCuenta.includes(numerosBusqueda) ||
+                numerosBusqueda.includes(numerosCuenta) ||
+                (numerosBusqueda.length >= 6 && numerosCuenta.includes(numerosBusqueda)) ||
+                (numerosCuenta.length >= 6 && numerosBusqueda.includes(numerosCuenta))
+              
+              if (coincide) {
+                // Crear el objeto GameSummary para el resultado
+                const nombreFromId = juegoId
+                  .split('_')
+                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(' ')
+
+                let tipoPromocion: 'ninguna' | 'oferta' | 'promocion' = 'ninguna'
+                if (juegoDocData.tipoPromocion) {
+                  tipoPromocion = juegoDocData.tipoPromocion
+                } else if (juegoDocData.isOffert === true) {
+                  tipoPromocion = 'oferta'
+                }
+
+                const juegoSummary: GameSummary = {
+                  id: juegoId,
+                  nombre: juegoDocData.nombre || correoData.nombre || nombreFromId,
+                  costo: juegoDocData.costo !== undefined ? juegoDocData.costo : (correoData.costo || 0),
+                  version: juegoDocData.version || correoData.version || plataforma,
+                  foto: juegoDocData.foto || '',
+                  isOffert: juegoDocData.isOffert || false,
+                  tipoPromocion,
+                  totalCorreos: 0,
+                  correos: [],
+                  stockAccounts: 0
+                }
+
+                // Crear el objeto GameEmailAccount
+                const emailAccount: GameEmailAccount = {
+                  correo: correoDoc.id,
+                  nombre: correoData.nombre || '',
+                  costo: correoData.costo || 0,
+                  version: correoData.version || plataforma,
+                  codigoMaster: correoData.codigoMaster || '',
+                  codigosGenerados: correoData.codigosGenerados || [],
+                  fecha: correoData.fecha?.toDate() || new Date(),
+                  codigo: correoData.codigo || '',
+                  cuentas: cuentas,
+                  saldo: correoData.saldo !== undefined ? correoData.saldo : undefined,
+                  createdAt: correoData.createdAt?.toDate() || new Date(),
+                  updatedAt: correoData.updatedAt?.toDate() || new Date(),
+                  createdBy: correoData.createdBy
+                }
+
+                resultados.push({
+                  juego: juegoSummary,
+                  correo: emailAccount,
+                  cuenta: cuenta
+                })
+              }
+            }
+          }
+        }
+      }
+
+      return resultados
+    } catch (error) {
+      console.error('Error buscando por teléfono:', error)
+      throw error
+    }
+  }
+
+  const buscarPorCorreo = async (
+    correo: string,
+    plataforma: GamePlatform = 'PS4 & PS5'
+  ): Promise<CorreoSearchResult[]> => {
+    if (!correo || correo.trim().length < 3) {
+      return []
+    }
+
+    try {
+      const resultados: CorreoSearchResult[] = []
+      
+      // Normalizar correo de búsqueda: convertir a minúsculas y eliminar espacios
+      const correoInput = correo.trim().toLowerCase()
+      
+      // Cargar todos los juegos de la plataforma
+      const plataformaRef = collection(db, 'games', plataforma, 'juegos')
+      const querySnapshot = await getDocs(plataformaRef)
+
+      // Iterar sobre cada juego
+      for (const juegoDoc of querySnapshot.docs) {
+        const juegoId = juegoDoc.id
+        const juegoDocData = juegoDoc.data()
+
+        // Obtener todos los correos del juego
+        const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
+        const correosSnapshot = await getDocs(correosRef)
+
+        // Buscar en cada correo
+        for (const correoDoc of correosSnapshot.docs) {
+          const correoId = correoDoc.id.toLowerCase()
+          const correoData = correoDoc.data()
+          
+          // Buscar coincidencias en el ID del correo (que es el email)
+          // Permitir búsqueda parcial
+          if (correoId.includes(correoInput) || correoInput.includes(correoId)) {
+            // Crear el objeto GameSummary para el resultado
+            const nombreFromId = juegoId
+              .split('_')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ')
+
+            let tipoPromocion: 'ninguna' | 'oferta' | 'promocion' = 'ninguna'
+            if (juegoDocData.tipoPromocion) {
+              tipoPromocion = juegoDocData.tipoPromocion
+            } else if (juegoDocData.isOffert === true) {
+              tipoPromocion = 'oferta'
+            }
+
+            const juegoSummary: GameSummary = {
+              id: juegoId,
+              nombre: juegoDocData.nombre || correoData.nombre || nombreFromId,
+              costo: juegoDocData.costo !== undefined ? juegoDocData.costo : (correoData.costo || 0),
+              version: juegoDocData.version || correoData.version || plataforma,
+              foto: juegoDocData.foto || '',
+              isOffert: juegoDocData.isOffert || false,
+              tipoPromocion,
+              totalCorreos: 0,
+              correos: [],
+              stockAccounts: 0
+            }
+
+            // Crear el objeto GameEmailAccount
+            const emailAccount: GameEmailAccount = {
+              correo: correoDoc.id,
+              nombre: correoData.nombre || '',
+              costo: correoData.costo || 0,
+              version: correoData.version || plataforma,
+              codigoMaster: correoData.codigoMaster || '',
+              codigosGenerados: correoData.codigosGenerados || [],
+              fecha: correoData.fecha?.toDate() || new Date(),
+              codigo: correoData.codigo || '',
+              cuentas: correoData.cuentas || [],
+              saldo: correoData.saldo !== undefined ? correoData.saldo : undefined,
+              createdAt: correoData.createdAt?.toDate() || new Date(),
+              updatedAt: correoData.updatedAt?.toDate() || new Date(),
+              createdBy: correoData.createdBy
+            }
+
+            resultados.push({
+              juego: juegoSummary,
+              correo: emailAccount
+            })
+          }
+        }
+      }
+
+      return resultados
+    } catch (error) {
+      console.error('Error buscando por correo:', error)
+      throw error
+    }
+  }
+
   return {
     games,
     gameEmails,
@@ -418,6 +629,8 @@ export function useGames() {
     actualizarFotoJuego,
     buscarJuegos,
     filtrarJuegosPorPrecio,
+    buscarPorTelefono,
+    buscarPorCorreo,
     generarIdJuego
   }
 }

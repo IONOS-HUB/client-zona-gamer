@@ -2,8 +2,9 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGames } from '@/composables/useGames'
-import type { GamePlatform, GameSummary } from '@/types/game'
-import { BarChart3, TrendingUp, Package, Filter, Search, RefreshCw, ArrowRight } from 'lucide-vue-next'
+import type { GamePlatform, GameSummary, TelefonoSearchResult } from '@/types/game'
+import { BarChart3, TrendingUp, Package, Filter, Search, RefreshCw, ArrowRight, Phone } from 'lucide-vue-next'
+import type { HistoryState } from 'vue-router'
 
 interface Props {
   readOnly?: boolean
@@ -14,15 +15,18 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const router = useRouter()
-const { games, cargarJuegos, cargando } = useGames()
+const { games, cargarJuegos, buscarPorTelefono } = useGames()
 
 // Estados de filtros
 const plataformaFiltro = ref<GamePlatform>('PS4 & PS5')
 const searchTerm = ref('')
 const promoFiltro = ref<'todas' | 'oferta' | 'promocion' | 'ninguna'>('todas')
 const stockFiltro = ref<'todas' | 'con' | 'sin'>('todas')
-const sortBy = ref<'nombre' | 'costo' | 'correos'>('nombre')
+const sortBy = ref<'nombre' | 'costo' | 'correos' | 'stock'>('nombre')
 const sortOrder = ref<'asc' | 'desc'>('asc')
+const telefonoBusqueda = ref('')
+const resultadosTelefono = ref<any[]>([])
+const isLoadingTelefono = ref(false)
 
 // Cargar juegos
 const cargarDatos = async () => {
@@ -87,13 +91,16 @@ const juegosFiltrados = computed(() => {
     
     switch (sortBy.value) {
       case 'nombre':
-        compareValue = a.nombre.localeCompare(b.nombre)
+        compareValue = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
         break
       case 'costo':
         compareValue = a.costo - b.costo
         break
       case 'correos':
         compareValue = a.totalCorreos - b.totalCorreos
+        break
+      case 'stock':
+        compareValue = (a.stockAccounts || 0) - (b.stockAccounts || 0)
         break
     }
 
@@ -138,6 +145,33 @@ const estadisticas = computed(() => {
   }
 })
 
+const limpiarFiltros = (): void => {
+  plataformaFiltro.value = 'PS4 & PS5'
+  searchTerm.value = ''
+  promoFiltro.value = 'todas'
+  stockFiltro.value = 'todas'
+  sortBy.value = 'nombre'
+  sortOrder.value = 'asc'
+  telefonoBusqueda.value = ''
+  resultadosTelefono.value = []
+}
+
+const buscarTelefono = async (): Promise<void> => {
+  if (!telefonoBusqueda.value || telefonoBusqueda.value.trim().length < 3) {
+    resultadosTelefono.value = []
+    return
+  }
+
+  isLoadingTelefono.value = true
+  try {
+    resultadosTelefono.value = await buscarPorTelefono(telefonoBusqueda.value.trim(), plataformaFiltro.value)
+  } catch (error) {
+    console.error('Error buscando teléfono:', error)
+  } finally {
+    isLoadingTelefono.value = false
+  }
+}
+
 const formatearPrecio = (precio: number): string => {
   return new Intl.NumberFormat('es-EC', {
     style: 'currency',
@@ -145,12 +179,16 @@ const formatearPrecio = (precio: number): string => {
   }).format(precio)
 }
 
-const limpiarFiltros = (): void => {
-  plataformaFiltro.value = 'PS4 & PS5'
-  searchTerm.value = ''
-  promoFiltro.value = 'todas'
-  sortBy.value = 'nombre'
-  sortOrder.value = 'asc'
+const formatearFecha = (fecha: Date | string): string => {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha
+  return new Intl.DateTimeFormat('es-ES', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).format(date)
 }
 
 const toggleSortOrder = (): void => {
@@ -162,7 +200,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
   router.push({
     path: '/games',
     state: {
-      openGame: juego
+      openGame: juego as unknown as HistoryState
     }
   })
 }
@@ -184,8 +222,6 @@ const verDetallesJuego = (juego: GameSummary): void => {
       <button 
         @click="cargarDatos" 
         class="btn btn-circle btn-ghost"
-        :class="{ 'animate-spin': cargando }"
-        :disabled="cargando"
       >
         <RefreshCw :size="20" />
       </button>
@@ -194,7 +230,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
     <!-- Cards de Estadísticas Principales -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       <!-- Total de Juegos -->
-      <div class="stat bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl border border-primary/20 shadow-lg">
+      <div class="stat bg-linear-to-br from-primary/20 to-primary/5 rounded-2xl border border-primary/20 shadow-lg">
         <div class="stat-figure text-primary">
           <Package :size="32" />
         </div>
@@ -204,7 +240,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
       </div>
 
       <!-- Juegos en Oferta -->
-      <div class="stat bg-gradient-to-br from-error/20 to-error/5 rounded-2xl border border-error/20 shadow-lg">
+      <div class="stat bg-linear-gradient-to-br from-error/20 to-error/5 rounded-2xl border border-error/20 shadow-lg">
         <div class="stat-figure text-error">
           <TrendingUp :size="32" />
         </div>
@@ -216,7 +252,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
       </div>
 
       <!-- Costo Promedio -->
-      <div class="stat bg-gradient-to-br from-success/20 to-success/5 rounded-2xl border border-success/20 shadow-lg">
+      <div class="stat bg-linear-gradient-to-br from-success/20 to-success/5 rounded-2xl border border-success/20 shadow-lg">
         <div class="stat-figure text-success">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -230,7 +266,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
       </div>
 
       <!-- Total de Cuentas -->
-      <div class="stat bg-gradient-to-br from-warning/20 to-warning/5 rounded-2xl border border-warning/20 shadow-lg">
+      <div class="stat bg-linear-gradient-to-br from-warning/20 to-warning/5 rounded-2xl border border-warning/20 shadow-lg">
         <div class="stat-figure text-warning">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -242,7 +278,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
       </div>
 
       <!-- Cuentas con Stock -->
-      <div class="stat bg-gradient-to-br from-info/20 to-info/5 rounded-2xl border border-info/20 shadow-lg">
+      <div class="stat bg-linear-to-br from-info/20 to-info/5 rounded-2xl border border-info/20 shadow-lg">
         <div class="stat-figure text-info">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v2a2 2 0 002 2h2a2 2 0 002-2v-2m-6 0H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4m-6 0h6" />
@@ -260,7 +296,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
         <h3 class="card-title text-xl mb-4">Distribución por Plataforma</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- PS4 -->
-          <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg">
+          <div class="flex items-center justify-between p-4 bg-linear-to-r from-blue-500/10 to-transparent rounded-lg">
             <div>
               <p class="text-sm text-base-content/60">PlayStation 4</p>
               <p class="text-3xl font-bold text-blue-500">{{ estadisticas.juegosPS4 }}</p>
@@ -272,7 +308,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
           </div>
 
           <!-- PS5 -->
-          <div class="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500/10 to-transparent rounded-lg">
+          <div class="flex items-center justify-between p-4 bg-linear-to-r from-purple-500/10 to-transparent rounded-lg">
             <div>
               <p class="text-sm text-base-content/60">PlayStation 5</p>
               <p class="text-3xl font-bold text-purple-500">{{ estadisticas.juegosPS5 }}</p>
@@ -300,11 +336,11 @@ const verDetallesJuego = (juego: GameSummary): void => {
           </button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <!-- Búsqueda -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <!-- Búsqueda por Nombre -->
           <div class="form-control">
             <label class="label">
-              <span class="label-text font-semibold">Buscar</span>
+              <span class="label-text font-semibold">Buscar Juego</span>
             </label>
             <div class="relative">
               <input 
@@ -319,6 +355,32 @@ const verDetallesJuego = (juego: GameSummary): void => {
               />
               <Search :size="20" class="absolute left-3 top-3 text-base-content/40" />
             </div>
+          </div>
+
+          <!-- Búsqueda por Teléfono -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-semibold">Buscar por Teléfono</span>
+            </label>
+            <div class="relative">
+              <input 
+                v-model="telefonoBusqueda" 
+                type="text" 
+                placeholder="+593 99 358 6097..." 
+                class="input input-bordered w-full pl-10"
+                @keyup.enter="buscarTelefono"
+                autocomplete="off"
+              />
+              <Phone :size="20" class="absolute left-3 top-3 text-base-content/40" />
+            </div>
+            <button 
+              v-if="telefonoBusqueda && telefonoBusqueda.trim().length >= 3"
+              @click="buscarTelefono" 
+              class="btn btn-sm btn-primary btn-block mt-2"
+              :disabled="isLoadingTelefono"
+            >
+              {{ isLoadingTelefono ? 'Buscando...' : 'Buscar' }}
+            </button>
           </div>
 
           <!-- Filtro Plataforma -->
@@ -353,9 +415,10 @@ const verDetallesJuego = (juego: GameSummary): void => {
             </label>
             <div class="join w-full">
               <select v-model="sortBy" class="select select-bordered join-item flex-1">
-                <option value="nombre">Nombre</option>
+                <option value="nombre">Nombre (A-Z)</option>
                 <option value="costo">Precio</option>
                 <option value="correos">Cuentas</option>
+                <option value="stock">Stock</option>
               </select>
               <button 
                 @click="toggleSortOrder" 
@@ -397,6 +460,46 @@ const verDetallesJuego = (juego: GameSummary): void => {
       </div>
     </div>
 
+    <!-- Resultados de Búsqueda por Teléfono -->
+    <div v-if="resultadosTelefono.length > 0" class="card bg-base-100 shadow-xl mb-6">
+      <div class="card-body">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="card-title text-xl flex items-center gap-2">
+            <Phone :size="24" />
+            Resultados de Búsqueda por Teléfono ({{ resultadosTelefono.length }})
+          </h3>
+          <button @click="telefonoBusqueda = ''; resultadosTelefono = []" class="btn btn-sm btn-ghost">
+            ✕ Cerrar
+          </button>
+        </div>
+        <div class="space-y-3">
+          <div v-for="(resultado, index) in resultadosTelefono" :key="index" class="card bg-base-200 shadow">
+            <div class="card-body p-4">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h4 class="font-semibold">{{ resultado.cuenta.nombre }}</h4>
+                  <p class="text-sm text-base-content/60">
+                    <Phone :size="14" class="inline mr-1" />
+                    {{ resultado.cuenta.telefono }}
+                  </p>
+                  <p class="text-xs mt-1">
+                    <span class="badge badge-sm">{{ resultado.juego.nombre }}</span>
+                    <span class="badge badge-sm badge-outline ml-1">{{ resultado.correo.correo }}</span>
+                  </p>
+                </div>
+                <div class="badge badge-lg" :class="{
+                  'badge-primary': resultado.cuenta.tipo.includes('Principal'),
+                  'badge-secondary': resultado.cuenta.tipo.includes('Secundaria')
+                }">
+                  {{ resultado.cuenta.tipo }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tabla de Juegos Filtrados -->
     <div class="card bg-base-100 shadow-xl">
       <div class="card-body">
@@ -406,15 +509,7 @@ const verDetallesJuego = (juego: GameSummary): void => {
           </h3>
         </div>
 
-        <div v-if="cargando" class="flex justify-center p-8">
-          <span class="loading loading-spinner loading-lg"></span>
-        </div>
-
-        <div v-else-if="juegosFiltrados.length === 0" class="text-center p-8">
-          <p class="text-base-content/60">No se encontraron juegos con los filtros aplicados</p>
-        </div>
-
-        <div v-else class="overflow-x-auto">
+        <div class="overflow-x-auto">
             <table class="table table-zebra">
             <thead>
               <tr>
