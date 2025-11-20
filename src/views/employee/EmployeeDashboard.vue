@@ -176,12 +176,22 @@ const abrirModalWhatsApp = async (correo: GameEmailAccount, version?: 'PS4' | 'P
     return
   }
 
+  if (!currentUserData.value?.uid || !currentUserData.value?.email) {
+    alert('Error: No se pudo obtener la información del usuario')
+    return
+  }
+
   try {
     const juegoId = generarIdJuego(juegoSeleccionado.value.nombre)
     const mensaje = await generarYEliminarCodigos(
       correo,
       plataformaSeleccionada.value,
       juegoId,
+      juegoSeleccionado.value.nombre,
+      currentUserData.value.uid,
+      currentUserData.value.email,
+      currentUserData.value.displayName || currentUserData.value.email || 'Usuario',
+      currentUserData.value.role as 'admin' | 'employee',
       version
     )
 
@@ -960,27 +970,26 @@ const irAHome = (): void => {
                   >
                     Ver Detalles
                   </button>
-                  <div v-if="correo.version === 'PS4 & PS5'" class="dropdown dropdown-top dropdown-end">
+                  <div v-if="correo.version === 'PS4 & PS5'" class="dropdown dropdown-end">
                     <label
                       tabindex="0"
                       :class="['btn btn-sm gap-2', validarCodigosDisponibles(correo) ? 'btn-success' : 'btn-disabled']"
-                      :disabled="!validarCodigosDisponibles(correo) || isGenerating"
                     >
                       <MessageCircle :size="16" />
                       Generar Mensaje
                     </label>
-                    <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-white/10">
+                    <ul tabindex="0" class="dropdown-content z-50 menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-white/10 mt-2">
                       <li>
-                        <button @click="abrirModalWhatsApp(correo, 'PS4')" :disabled="isGenerating">
+                        <a @click.prevent="abrirModalWhatsApp(correo, 'PS4')" :class="{ 'disabled': isGenerating }">
                           <span class="badge badge-primary badge-sm">PS4</span>
                           Mensaje para PS4
-                        </button>
+                        </a>
                       </li>
                       <li>
-                        <button @click="abrirModalWhatsApp(correo, 'PS5')" :disabled="isGenerating">
+                        <a @click.prevent="abrirModalWhatsApp(correo, 'PS5')" :class="{ 'disabled': isGenerating }">
                           <span class="badge badge-secondary badge-sm">PS5</span>
                           Mensaje para PS5
-                        </button>
+                        </a>
                       </li>
                     </ul>
                   </div>

@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { doc, updateDoc, arrayRemove } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { GameEmailAccount, GamePlatform } from '@/types/game'
+import { useReportes } from './useReportes'
 
 export interface WhatsAppMessage {
   correo: string
@@ -15,6 +16,7 @@ export interface WhatsAppMessage {
 export function useWhatsAppMessages() {
   const isGenerating = ref(false)
   const error = ref<string | null>(null)
+  const { crearReporte } = useReportes()
 
   /**
    * Genera el mensaje de WhatsApp según la plataforma
@@ -78,10 +80,15 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
    * Obtiene los primeros dos códigos disponibles
    */
   const obtenerCodigosParaUsar = (correo: GameEmailAccount): [string, string] | null => {
-    if (!validarCodigosDisponibles(correo)) {
+    if (!validarCodigosDisponibles(correo) || !correo.codigosGenerados) {
       return null
     }
-    return [correo.codigosGenerados[0], correo.codigosGenerados[1]]
+    const codigo1 = correo.codigosGenerados[0]
+    const codigo2 = correo.codigosGenerados[1]
+    if (!codigo1 || !codigo2) {
+      return null
+    }
+    return [codigo1, codigo2]
   }
 
   /**
@@ -230,12 +237,17 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
   }
 
   /**
-   * Proceso completo: generar mensaje y eliminar códigos
+   * Proceso completo: generar mensaje, eliminar códigos y crear reporte
    */
   const generarYEliminarCodigos = async (
     correo: GameEmailAccount,
     plataforma: GamePlatform,
     juegoId: string,
+    juegoNombre: string,
+    uid: string,
+    email: string,
+    nombreUsuario: string,
+    rol: 'admin' | 'employee',
     versionSeleccionada?: 'PS4' | 'PS5'
   ): Promise<WhatsAppMessage | null> => {
     try {
@@ -259,6 +271,29 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
 
       if (!eliminado) {
         error.value = 'El mensaje se generó pero hubo un error al eliminar los códigos'
+      }
+
+      // Crear reporte del mensaje generado
+      try {
+        await crearReporte(
+          uid,
+          email,
+          nombreUsuario,
+          rol,
+          juegoNombre,
+          juegoId,
+          correo.version,
+          correo.correo,
+          {
+            codigo1: mensaje.codigoVerificacion1,
+            codigo2: mensaje.codigoVerificacion2
+          },
+          mensaje.version
+        )
+        console.log('📝 Reporte guardado exitosamente')
+      } catch (reporteError) {
+        console.error('Error guardando reporte:', reporteError)
+        // No fallar si el reporte falla, el mensaje ya se generó
       }
 
       return mensaje

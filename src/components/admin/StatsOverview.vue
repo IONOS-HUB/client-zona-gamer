@@ -5,6 +5,7 @@ import { useGames } from '@/composables/useGames'
 import type { GamePlatform, GameSummary, TelefonoSearchResult } from '@/types/game'
 import { BarChart3, TrendingUp, Package, Filter, Search, RefreshCw, ArrowRight, Phone } from 'lucide-vue-next'
 import type { HistoryState } from 'vue-router'
+import DashboardCharts from './DashboardCharts.vue'
 
 interface Props {
   readOnly?: boolean
@@ -358,8 +359,18 @@ const verDetallesJuego = (juego: GameSummary): void => {
       </div>
     </div>
 
+    <!-- Gráficos Visuales -->
+    <DashboardCharts 
+      :totalJuegos="estadisticas.totalJuegos"
+      :totalCorreos="estadisticas.totalCorreos"
+      :juegosPS4="estadisticas.juegosPS4"
+      :juegosPS5="estadisticas.juegosPS5"
+      :juegosPS4PS5="games.filter(j => j.version === 'PS4 & PS5').length"
+      :stockTotal="estadisticas.totalStock"
+    />
+
     <!-- Filtros Avanzados -->
-    <div class="card bg-base-100 shadow-xl">
+    <div class="card bg-base-100 shadow-xl mt-6">
       <div class="card-body">
         <div class="flex justify-between items-center mb-4">
           <h3 class="card-title text-xl flex items-center gap-2">

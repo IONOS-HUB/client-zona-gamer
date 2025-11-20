@@ -8,13 +8,16 @@ import { auth } from '@/config/firebase'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { AppUser, UserRole } from '@/types/user'
-import { BarChart3, Users, Gamepad2, Home, Phone, Search, Mail, RefreshCw, MessageCircle } from 'lucide-vue-next'
+import { BarChart3, Users, Gamepad2, Home, Phone, Search, Mail, RefreshCw, MessageCircle, FileText, Calendar } from 'lucide-vue-next'
 import StatsOverview from '@/components/admin/StatsOverview.vue'
 import WhatsAppMessageModal from '@/components/ui/WhatsAppMessageModal.vue'
+import ReportesCharts from '@/components/admin/ReportesCharts.vue'
 import { useGames } from '@/composables/useGames'
 import { useWhatsAppMessages } from '@/composables/useWhatsAppMessages'
+import { useReportes } from '@/composables/useReportes'
 import type { TelefonoSearchResult, CorreoSearchResult, GamePlatform, AccountOwner, GameSummary, GameEmailAccount, AccountType } from '@/types/game'
 import type { WhatsAppMessage } from '@/composables/useWhatsAppMessages'
+import type { Reporte } from '@/types/reporte'
 
 const router = useRouter()
 const { signOut } = useAuth()
@@ -47,8 +50,15 @@ const {
   isGenerating
 } = useWhatsAppMessages()
 
+const {
+  reportes,
+  isLoadingReportes,
+  cargarReportes,
+  obtenerEstadisticas
+} = useReportes()
+
 // Estado para el tab activo
-const activeTab = ref<'stats' | 'users' | 'telefono' | 'correo' | 'games'>('stats')
+const activeTab = ref<'stats' | 'users' | 'telefono' | 'correo' | 'games' | 'reportes'>('stats')
 
 // Estados para búsqueda por teléfono
 const telefonoBusqueda = ref('')
@@ -503,6 +513,15 @@ const selectedEmailDetails = ref<GameEmailAccount | null>(null)
 // Estados para WhatsApp
 const showWhatsAppModal = ref(false)
 const mensajeWhatsApp = ref<WhatsAppMessage | null>(null)
+
+// Estados para reportes
+const filtroUsuarioReporte = ref<string>('')
+const filtroRolReporte = ref<'admin' | 'employee' | ''>('')
+const busquedaReporte = ref('')
+const limiteReportes = ref(100)
+const fechaInicio = ref('')
+const fechaFin = ref('')
+const mostrarGraficos = ref(true)
 
 // Estados para editar juego
 const showEditGame = ref(false)
@@ -1163,12 +1182,22 @@ const abrirModalWhatsApp = async (correo: GameEmailAccount, version?: 'PS4' | 'P
     return
   }
 
+  if (!currentUserData.value?.uid || !currentUserData.value?.email) {
+    alert('Error: No se pudo obtener la información del usuario')
+    return
+  }
+
   try {
     const juegoId = generarIdJuego(juegoSeleccionado.value.nombre)
     const mensaje = await generarYEliminarCodigos(
       correo,
       plataformaSeleccionada.value,
       juegoId,
+      juegoSeleccionado.value.nombre,
+      currentUserData.value.uid,
+      currentUserData.value.email,
+      currentUserData.value.displayName || currentUserData.value.email || 'Usuario',
+      currentUserData.value.role as 'admin' | 'employee',
       version
     )
 
@@ -1204,6 +1233,70 @@ const copiarMensajeWhatsApp = async (mensaje: string): Promise<void> => {
     alert('No se pudo copiar el mensaje. Por favor, cópialo manualmente.')
   }
 }
+
+// Funciones para Reportes
+const cargarReportesConFiltros = async (): Promise<void> => {
+  const filtros = {
+    uid: filtroUsuarioReporte.value || undefined,
+    rol: (filtroRolReporte.value as 'admin' | 'employee') || undefined,
+    busqueda: busquedaReporte.value || undefined,
+    fechaInicio: fechaInicio.value ? new Date(fechaInicio.value) : undefined,
+    fechaFin: fechaFin.value ? new Date(fechaFin.value + 'T23:59:59') : undefined
+  }
+  await cargarReportes(filtros, limiteReportes.value)
+}
+
+const limpiarFiltrosReportes = (): void => {
+  filtroUsuarioReporte.value = ''
+  filtroRolReporte.value = ''
+  busquedaReporte.value = ''
+  fechaInicio.value = ''
+  fechaFin.value = ''
+  cargarReportesConFiltros()
+}
+
+const aplicarFiltroRapido = (dias: number): void => {
+  const hoy = new Date()
+  const inicio = new Date()
+  inicio.setDate(hoy.getDate() - dias)
+  
+  fechaInicio.value = inicio.toISOString().split('T')[0] as string
+  fechaFin.value = hoy.toISOString().split('T')[0] as string
+  cargarReportesConFiltros()
+}
+
+const formatearFechaReporte = (fecha: Date): string => {
+  return new Intl.DateTimeFormat('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  }).format(fecha)
+}
+
+const reportesFiltrados = computed(() => {
+  return reportes.value
+})
+
+const estadisticasReportes = computed(() => {
+  return obtenerEstadisticas()
+})
+
+const usuariosUnicos = computed(() => {
+  const usuarios = new Map<string, { email: string; nombre: string; uid: string }>()
+  reportes.value.forEach(r => {
+    if (!usuarios.has(r.uid)) {
+      usuarios.set(r.uid, {
+        uid: r.uid,
+        email: r.email,
+        nombre: r.nombreUsuario || r.email
+      })
+    }
+  })
+  return Array.from(usuarios.values())
+})
 
 const iniciarCreacionJuego = (): void => {
   newGameName.value = ''
@@ -1381,6 +1474,11 @@ watch(activeTab, async (newTab) => {
     // Detener sincronización automática cuando se sale del tab de juegos
     detenerSincronizacionAutomatica()
   }
+  
+  // Cargar reportes cuando se entra al tab de reportes
+  if (newTab === 'reportes') {
+    await cargarReportesConFiltros()
+  }
 })
 
 // Watcher para sincronizar cuando cambia la plataforma
@@ -1496,6 +1594,13 @@ onBeforeUnmount(() => {
           >
             <Gamepad2 :size="18" />
             Gestión de Juegos
+          </button>
+          <button 
+            @click="activeTab = 'reportes'" 
+            :class="['tab gap-2 transition-all', activeTab === 'reportes' ? 'tab-active' : '']"
+          >
+            <FileText :size="18" />
+            Reportes
           </button>
         </div>
       </div>
@@ -2360,7 +2465,7 @@ onBeforeUnmount(() => {
                           >
                             <MessageCircle :size="14" />
                           </label>
-                          <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-white/10 mt-2">
+                          <ul tabindex="0" class="dropdown-content z-100 menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-white/10 mt-2">
                             <li>
                               <a @click.prevent="abrirModalWhatsApp(email, 'PS4')" class="text-xs">
                                 <span class="badge badge-primary badge-sm">PS4</span>
@@ -3769,6 +3874,220 @@ onBeforeUnmount(() => {
         <button @click="cerrarDetalles">close</button>
       </form>
     </dialog>
+
+    <!-- Tab: Reportes -->
+    <div v-if="activeTab === 'reportes'">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h1 class="text-3xl font-bold flex items-center gap-3">
+            <FileText :size="32" class="text-primary" />
+            Reportes de Mensajes WhatsApp
+          </h1>
+          <p class="text-base-content/60 mt-1">Historial de mensajes generados por usuarios</p>
+        </div>
+        <button @click="cargarReportesConFiltros" class="btn btn-primary gap-2" :disabled="isLoadingReportes">
+          <RefreshCw :size="18" :class="{ 'animate-spin': isLoadingReportes }" />
+          Actualizar
+        </button>
+      </div>
+
+      <!-- Estadísticas -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat bg-base-100 rounded-lg shadow">
+          <div class="stat-title">Total Reportes</div>
+          <div class="stat-value text-primary">{{ estadisticasReportes.totalReportes }}</div>
+        </div>
+        <div class="stat bg-base-100 rounded-lg shadow">
+          <div class="stat-title">Mensajes PS4</div>
+          <div class="stat-value text-info">{{ estadisticasReportes.porPlataforma.PS4 || 0 }}</div>
+        </div>
+        <div class="stat bg-base-100 rounded-lg shadow">
+          <div class="stat-title">Mensajes PS5</div>
+          <div class="stat-value text-secondary">{{ estadisticasReportes.porPlataforma.PS5 || 0 }}</div>
+        </div>
+        <div class="stat bg-base-100 rounded-lg shadow">
+          <div class="stat-title">Por Admins</div>
+          <div class="stat-value text-success">{{ estadisticasReportes.porRol.admin || 0 }}</div>
+        </div>
+      </div>
+
+      <!-- Filtros Rápidos -->
+      <div class="flex gap-2 mb-4 flex-wrap">
+        <button @click="aplicarFiltroRapido(1)" class="btn btn-sm btn-outline">
+          <Calendar :size="16" />
+          Hoy
+        </button>
+        <button @click="aplicarFiltroRapido(7)" class="btn btn-sm btn-outline">
+          <Calendar :size="16" />
+          Últimos 7 días
+        </button>
+        <button @click="aplicarFiltroRapido(30)" class="btn btn-sm btn-outline">
+          <Calendar :size="16" />
+          Últimos 30 días
+        </button>
+        <button @click="aplicarFiltroRapido(90)" class="btn btn-sm btn-outline">
+          <Calendar :size="16" />
+          Últimos 3 meses
+        </button>
+        <div class="ml-auto">
+          <button @click="mostrarGraficos = !mostrarGraficos" class="btn btn-sm btn-outline gap-2">
+            <BarChart3 :size="16" />
+            {{ mostrarGraficos ? 'Ocultar' : 'Mostrar' }} Gráficos
+          </button>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div v-if="mostrarGraficos && reportesFiltrados.length > 0" class="mb-6">
+        <ReportesCharts :reportes="reportesFiltrados" />
+      </div>
+
+      <!-- Filtros Detallados -->
+      <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+          <h3 class="card-title text-lg mb-4">🔍 Filtros Detallados</h3>
+          
+          <!-- Primera fila -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">📅 Fecha Inicio</span>
+              </label>
+              <input
+                v-model="fechaInicio"
+                type="date"
+                class="input input-bordered"
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">📅 Fecha Fin</span>
+              </label>
+              <input
+                v-model="fechaFin"
+                type="date"
+                class="input input-bordered"
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">👤 Usuario</span>
+              </label>
+              <select v-model="filtroUsuarioReporte" class="select select-bordered">
+                <option value="">Todos los usuarios</option>
+                <option v-for="usuario in usuariosUnicos" :key="usuario.uid" :value="usuario.uid">
+                  {{ usuario.nombre }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Segunda fila -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">🎭 Rol</span>
+              </label>
+              <select v-model="filtroRolReporte" class="select select-bordered">
+                <option value="">Todos los roles</option>
+                <option value="admin">Admin</option>
+                <option value="employee">Empleado</option>
+              </select>
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">🔎 Buscar</span>
+              </label>
+              <input
+                v-model="busquedaReporte"
+                type="text"
+                placeholder="Juego, correo, usuario..."
+                class="input input-bordered"
+              />
+            </div>
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text opacity-0">Acciones</span>
+              </label>
+              <div class="flex gap-2">
+                <button @click="cargarReportesConFiltros" class="btn btn-primary flex-1">
+                  Aplicar
+                </button>
+                <button @click="limpiarFiltrosReportes" class="btn btn-ghost">
+                  Limpiar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de Reportes -->
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <div v-if="isLoadingReportes" class="flex justify-center p-8">
+            <span class="loading loading-spinner loading-lg"></span>
+          </div>
+
+          <div v-else-if="reportesFiltrados.length === 0" class="text-center p-8">
+            <FileText :size="48" class="mx-auto text-base-content/30 mb-4" />
+            <p class="text-base-content/60">No hay reportes disponibles</p>
+          </div>
+
+          <div v-else class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Fecha</th>
+                  <th>Usuario</th>
+                  <th>Rol</th>
+                  <th>Juego</th>
+                  <th>Correo</th>
+                  <th>Plataforma</th>
+                  <th>Códigos Usados</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(reporte, index) in reportesFiltrados" :key="reporte.id">
+                  <td>{{ index + 1 }}</td>
+                  <td class="text-sm">{{ formatearFechaReporte(reporte.fechaGeneracion) }}</td>
+                  <td>
+                    <div class="font-medium">{{ reporte.nombreUsuario }}</div>
+                    <div class="text-xs opacity-60">{{ reporte.email }}</div>
+                  </td>
+                  <td>
+                    <span :class="['badge badge-sm', reporte.rol === 'admin' ? 'badge-primary' : 'badge-secondary']">
+                      {{ reporte.rol === 'admin' ? 'Admin' : 'Empleado' }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="font-medium">{{ reporte.juegoNombre }}</div>
+                    <div class="text-xs opacity-60">{{ reporte.plataforma }}</div>
+                  </td>
+                  <td class="font-mono text-xs">{{ reporte.correoUtilizado }}</td>
+                  <td>
+                    <span :class="['badge', reporte.plataformaMensaje === 'PS4' ? 'badge-info' : 'badge-secondary']">
+                      {{ reporte.plataformaMensaje }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="flex flex-col gap-1">
+                      <span class="badge badge-outline badge-sm">{{ reporte.codigosUsados.codigo1 }}</span>
+                      <span class="badge badge-outline badge-sm">{{ reporte.codigosUsados.codigo2 }}</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-if="reportesFiltrados.length > 0" class="mt-4 text-sm text-base-content/60 text-center">
+            Mostrando {{ reportesFiltrados.length }} reporte(s)
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal de WhatsApp -->
     <WhatsAppMessageModal

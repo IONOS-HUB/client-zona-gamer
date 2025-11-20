@@ -819,12 +819,22 @@ const abrirModalWhatsApp = async (correo: GameEmailAccount, version?: 'PS4' | 'P
     return
   }
 
+  if (!currentUserData.value?.uid || !currentUserData.value?.email) {
+    alert('Error: No se pudo obtener la información del usuario')
+    return
+  }
+
   try {
     const juegoId = generarIdJuego(juegoSeleccionado.value.nombre)
     const mensaje = await generarYEliminarCodigos(
       correo,
       plataformaSeleccionada.value,
       juegoId,
+      juegoSeleccionado.value.nombre,
+      currentUserData.value.uid,
+      currentUserData.value.email,
+      currentUserData.value.displayName || currentUserData.value.email || 'Usuario',
+      currentUserData.value.role as 'admin' | 'employee',
       version
     )
 
