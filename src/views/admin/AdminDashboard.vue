@@ -1236,14 +1236,13 @@ const copiarMensajeWhatsApp = async (mensaje: string): Promise<void> => {
 
 // Funciones para Reportes
 const cargarReportesConFiltros = async (): Promise<void> => {
-  const filtros = {
-    uid: filtroUsuarioReporte.value || undefined,
-    rol: (filtroRolReporte.value as 'admin' | 'employee') || undefined,
-    busqueda: busquedaReporte.value || undefined,
-    fechaInicio: fechaInicio.value ? new Date(fechaInicio.value) : undefined,
-    fechaFin: fechaFin.value ? new Date(fechaFin.value + 'T23:59:59') : undefined
-  }
-  await cargarReportes(filtros, limiteReportes.value)
+  // Solo cargar todos los reportes sin filtros
+  // Los filtros se aplican en memoria con el computed reportesFiltrados
+  await cargarReportes({}, limiteReportes.value)
+  
+  console.log('📊 Reportes cargados:', reportes.value.length)
+  console.log('🔍 Filtros activos:', filtrosActivos.value)
+  console.log('📋 Reportes filtrados:', reportesFiltrados.value.length)
 }
 
 const limpiarFiltrosReportes = (): void => {
@@ -1252,7 +1251,7 @@ const limpiarFiltrosReportes = (): void => {
   busquedaReporte.value = ''
   fechaInicio.value = ''
   fechaFin.value = ''
-  cargarReportesConFiltros()
+  // No es necesario llamar a cargarReportesConFiltros() porque los watchers lo harán
 }
 
 const aplicarFiltroRapido = (dias: number): void => {
@@ -1262,7 +1261,7 @@ const aplicarFiltroRapido = (dias: number): void => {
   
   fechaInicio.value = inicio.toISOString().split('T')[0] as string
   fechaFin.value = hoy.toISOString().split('T')[0] as string
-  cargarReportesConFiltros()
+  // No es necesario llamar a cargarReportesConFiltros() porque los watchers lo harán
 }
 
 const formatearFechaReporte = (fecha: Date): string => {
@@ -1277,11 +1276,66 @@ const formatearFechaReporte = (fecha: Date): string => {
 }
 
 const reportesFiltrados = computed(() => {
-  return reportes.value
+  let resultado = reportes.value
+  
+  // Filtrar por usuario
+  if (filtroUsuarioReporte.value) {
+    resultado = resultado.filter(r => r.uid === filtroUsuarioReporte.value)
+  }
+  
+  // Filtrar por rol
+  if (filtroRolReporte.value) {
+    resultado = resultado.filter(r => r.rol === filtroRolReporte.value)
+  }
+  
+  // Filtrar por búsqueda
+  if (busquedaReporte.value && busquedaReporte.value.trim()) {
+    const busqueda = busquedaReporte.value.toLowerCase().trim()
+    resultado = resultado.filter(r =>
+      r.juegoNombre.toLowerCase().includes(busqueda) ||
+      r.correoUtilizado.toLowerCase().includes(busqueda) ||
+      (r.nombreUsuario && r.nombreUsuario.toLowerCase().includes(busqueda)) ||
+      r.email.toLowerCase().includes(busqueda)
+    )
+  }
+  
+  // Filtrar por fecha inicio
+  if (fechaInicio.value) {
+    const fechaInicioDate = new Date(fechaInicio.value)
+    fechaInicioDate.setHours(0, 0, 0, 0)
+    resultado = resultado.filter(r => {
+      const fechaReporte = new Date(r.fechaGeneracion)
+      fechaReporte.setHours(0, 0, 0, 0)
+      return fechaReporte >= fechaInicioDate
+    })
+  }
+  
+  // Filtrar por fecha fin
+  if (fechaFin.value) {
+    const fechaFinDate = new Date(fechaFin.value)
+    fechaFinDate.setHours(23, 59, 59, 999)
+    resultado = resultado.filter(r => {
+      const fechaReporte = new Date(r.fechaGeneracion)
+      return fechaReporte <= fechaFinDate
+    })
+  }
+  
+  return resultado
 })
 
 const estadisticasReportes = computed(() => {
   return obtenerEstadisticas()
+})
+
+// Computed para contar filtros activos
+const filtrosActivos = computed(() => {
+  let count = 0
+  if (filtroUsuarioReporte.value) count++
+  if (filtroRolReporte.value) count++
+  if (busquedaReporte.value) count++
+  if (fechaInicio.value) count++
+  if (fechaFin.value) count++
+  return count
 })
 
 const usuariosUnicos = computed(() => {
@@ -1480,6 +1534,9 @@ watch(activeTab, async (newTab) => {
     await cargarReportesConFiltros()
   }
 })
+
+// Los filtros ahora son reactivos automáticamente a través del computed reportesFiltrados
+// No necesitamos watchers porque Vue detecta los cambios automáticamente
 
 // Watcher para sincronizar cuando cambia la plataforma
 watch(plataformaSeleccionada, async () => {
@@ -3945,7 +4002,17 @@ onBeforeUnmount(() => {
       <!-- Filtros Detallados -->
       <div class="card bg-base-100 shadow-xl mb-6">
         <div class="card-body">
-          <h3 class="card-title text-lg mb-4">🔍 Filtros Detallados</h3>
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="card-title text-lg">
+              🔍 Filtros Detallados
+              <span v-if="filtrosActivos > 0" class="badge badge-primary ml-2">
+                {{ filtrosActivos }} activo{{ filtrosActivos > 1 ? 's' : '' }}
+              </span>
+            </h3>
+            <div class="text-sm text-base-content/60">
+              Filtros dinámicos - Se actualizan automáticamente
+            </div>
+          </div>
           
           <!-- Primera fila -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
@@ -3996,7 +4063,12 @@ onBeforeUnmount(() => {
             </div>
             <div class="form-control">
               <label class="label">
-                <span class="label-text font-semibold">🔎 Buscar</span>
+                <span class="label-text font-semibold">
+                  🔎 Buscar
+                  <span v-if="busquedaReporte && busquedaReporte.length > 0" class="badge badge-sm badge-primary ml-2">
+                    Filtrando
+                  </span>
+                </span>
               </label>
               <input
                 v-model="busquedaReporte"
@@ -4009,14 +4081,10 @@ onBeforeUnmount(() => {
               <label class="label">
                 <span class="label-text opacity-0">Acciones</span>
               </label>
-              <div class="flex gap-2">
-                <button @click="cargarReportesConFiltros" class="btn btn-primary flex-1">
-                  Aplicar
-                </button>
-                <button @click="limpiarFiltrosReportes" class="btn btn-ghost">
-                  Limpiar
-                </button>
-              </div>
+              <button @click="limpiarFiltrosReportes" class="btn btn-ghost btn-block">
+                <RefreshCw :size="16" />
+                Limpiar Filtros
+              </button>
             </div>
           </div>
         </div>
