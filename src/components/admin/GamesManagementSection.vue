@@ -3,11 +3,15 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useGames } from '@/composables/useGames'
 import { useWhatsAppMessages } from '@/composables/useWhatsAppMessages'
 import { useRoles } from '@/composables/useRoles'
-import { Gamepad2, Search, Phone, Mail, RefreshCw, MessageCircle } from 'lucide-vue-next'
+import { Gamepad2, Search, Phone, Mail, RefreshCw, MessageCircle, Plus, Edit } from 'lucide-vue-next'
 import WhatsAppMessageModal from '@/components/ui/WhatsAppMessageModal.vue'
 import DeleteConfirmModal from './modals/DeleteConfirmModal.vue'
-import type { GameSummary, GameEmailAccount, GamePlatform, TelefonoSearchResult, CorreoSearchResult, AccountOwner, AccountType } from '@/types/game'
+import GameFormModal from './modals/GameFormModal.vue'
+import EmailFormModal from './modals/EmailFormModal.vue'
+import type { GameSummary, GameEmailAccount, GamePlatform, TelefonoSearchResult, CorreoSearchResult, AccountOwner } from '@/types/game'
 import type { WhatsAppMessage } from '@/composables/useWhatsAppMessages'
+import type { GameFormData } from './modals/GameFormModal.vue'
+import type { EmailFormData } from './modals/EmailFormModal.vue'
 
 const {
   games,
@@ -77,6 +81,18 @@ const deleteSuccess = ref('')
 // Mensajes de éxito/error generales
 const successMessage = ref('')
 const errorMessage = ref('')
+
+// Estados para modal de juego
+const showGameForm = ref(false)
+const editingGame = ref<GameSummary | null>(null)
+const isSavingGame = ref(false)
+const gameFormError = ref('')
+
+// Estados para modal de correo
+const showEmailForm = ref(false)
+const editingEmail = ref<GameEmailAccount | null>(null)
+const isSavingEmail = ref(false)
+const emailFormError = ref('')
 
 // Computed para juegos filtrados
 const juegosFiltrados = computed(() => {
@@ -329,6 +345,123 @@ const cancelarEliminacion = (): void => {
   deleteError.value = ''
 }
 
+// Funciones para modal de juego
+const abrirModalCrearJuego = (): void => {
+  editingGame.value = null
+  gameFormError.value = ''
+  showGameForm.value = true
+}
+
+const abrirModalEditarJuego = (juego: GameSummary): void => {
+  editingGame.value = juego
+  gameFormError.value = ''
+  showGameForm.value = true
+}
+
+const handleSaveGame = async (data: GameFormData): Promise<void> => {
+  isSavingGame.value = true
+  gameFormError.value = ''
+
+  try {
+    if (editingGame.value) {
+      // Actualizar juego existente
+      await actualizarJuego('PS4 & PS5', editingGame.value.id, {
+        nombre: data.nombre,
+        foto: data.foto,
+        version: data.version,
+        tipoPromocion: data.tipoPromocion
+      })
+      successMessage.value = 'Juego actualizado exitosamente'
+    } else {
+      // Crear nuevo juego
+      const isOffert = data.tipoPromocion === 'oferta'
+      await crearJuego('PS4 & PS5', data.nombre, data.foto, isOffert, data.version)
+      successMessage.value = 'Juego creado exitosamente'
+    }
+    
+    showGameForm.value = false
+    await cargarJuegosPorPlataforma()
+    setTimeout(() => { successMessage.value = '' }, 3000)
+  } catch (error: any) {
+    gameFormError.value = error?.message || 'Error al guardar el juego'
+  } finally {
+    isSavingGame.value = false
+  }
+}
+
+const cancelarGameForm = (): void => {
+  showGameForm.value = false
+  editingGame.value = null
+  gameFormError.value = ''
+}
+
+// Funciones para modal de correo
+const abrirModalCrearCorreo = (): void => {
+  if (!juegoSeleccionado.value) return
+  editingEmail.value = null
+  emailFormError.value = ''
+  showEmailForm.value = true
+}
+
+const abrirModalEditarCorreo = (email: GameEmailAccount): void => {
+  editingEmail.value = email
+  emailFormError.value = ''
+  showEmailForm.value = true
+}
+
+const handleSaveEmail = async (data: EmailFormData): Promise<void> => {
+  if (!juegoSeleccionado.value) return
+
+  isSavingEmail.value = true
+  emailFormError.value = ''
+
+  try {
+    if (editingEmail.value) {
+      // Actualizar correo existente
+      await actualizarCorreoJuego('PS4 & PS5', juegoSeleccionado.value.id, data.correo, {
+        nombre: data.nombre,
+        costo: data.costo,
+        version: data.version,
+        codigoMaster: data.codigoMaster,
+        codigo: data.codigo,
+        codigosGenerados: data.codigosGenerados,
+        cuentas: data.cuentas,
+        fecha: new Date(),
+        saldo: data.saldo
+      })
+      successMessage.value = 'Correo actualizado exitosamente'
+    } else {
+      // Crear nuevo correo
+      await crearCorreoJuego('PS4 & PS5', juegoSeleccionado.value.id, data.correo, {
+        nombre: data.nombre,
+        costo: data.costo,
+        version: data.version,
+        codigoMaster: data.codigoMaster,
+        codigo: data.codigo,
+        codigosGenerados: data.codigosGenerados,
+        cuentas: data.cuentas,
+        fecha: new Date(),
+        saldo: data.saldo
+      })
+      successMessage.value = 'Correo creado exitosamente'
+    }
+    
+    showEmailForm.value = false
+    await verCorreosJuego(juegoSeleccionado.value)
+    setTimeout(() => { successMessage.value = '' }, 3000)
+  } catch (error: any) {
+    emailFormError.value = error?.message || 'Error al guardar el correo'
+  } finally {
+    isSavingEmail.value = false
+  }
+}
+
+const cancelarEmailForm = (): void => {
+  showEmailForm.value = false
+  editingEmail.value = null
+  emailFormError.value = ''
+}
+
 // Utilidades
 const formatearPrecio = (precio: number): string => {
   return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(precio)
@@ -548,7 +681,25 @@ defineExpose({
     </div>
 
     <!-- Botones de acción -->
-    <div class="flex gap-2 mb-4">
+    <div class="flex flex-wrap gap-2 mb-4">
+      <button 
+        v-if="vistaActual === 'juegos' && isAdmin"
+        class="btn btn-primary gap-2"
+        @click="abrirModalCrearJuego"
+      >
+        <Plus :size="18" />
+        Crear Juego
+      </button>
+      
+      <button 
+        v-if="vistaActual === 'correos' && isAdmin"
+        class="btn btn-primary gap-2"
+        @click="abrirModalCrearCorreo"
+      >
+        <Plus :size="18" />
+        Agregar Correo
+      </button>
+      
       <button 
         v-if="vistaActual === 'juegos'"
         class="btn btn-outline btn-primary gap-2"
@@ -674,6 +825,9 @@ defineExpose({
                 <td>
                   <div class="flex gap-2">
                     <button class="btn btn-sm btn-info" @click="verCorreosJuego(juego)">Ver Correos</button>
+                    <button v-if="isAdmin" class="btn btn-sm btn-warning" @click="abrirModalEditarJuego(juego)">
+                      <Edit :size="14" />
+                    </button>
                     <button v-if="isAdmin" class="btn btn-sm btn-error" @click="iniciarEliminacion('juego', juego)">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -778,6 +932,10 @@ defineExpose({
                       <MessageCircle :size="14" />
                     </button>
                     
+                    <button v-if="isAdmin" class="btn btn-sm btn-warning" @click="abrirModalEditarCorreo(email)">
+                      <Edit :size="14" />
+                    </button>
+                    
                     <button v-if="isAdmin" class="btn btn-sm btn-error" @click="iniciarEliminacion('correo', email)">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -865,6 +1023,30 @@ defineExpose({
       :error="deleteError"
       @confirm="handleDelete"
       @cancel="cancelarEliminacion"
+    />
+
+    <!-- Modal de crear/editar juego -->
+    <GameFormModal
+      :show="showGameForm"
+      :game="editingGame"
+      :is-loading="isSavingGame"
+      :error="gameFormError"
+      @confirm="handleSaveGame"
+      @cancel="cancelarGameForm"
+    />
+
+    <!-- Modal de crear/editar correo -->
+    <EmailFormModal
+      v-if="juegoSeleccionado"
+      :show="showEmailForm"
+      :email="editingEmail"
+      :game-name="juegoSeleccionado.nombre"
+      :game-version="juegoSeleccionado.version"
+      :game-costo="juegoSeleccionado.costo"
+      :is-loading="isSavingEmail"
+      :error="emailFormError"
+      @confirm="handleSaveEmail"
+      @cancel="cancelarEmailForm"
     />
   </div>
 </template>
