@@ -117,28 +117,36 @@ export function useGames() {
         const juegoId = juegoDoc.id
         const juegoDocData = juegoDoc.data()
         
-        // Obtener todos los correos dentro de este juego
-      const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
-      const correosSnapshot = await getDocs(correosRef)
-
-      const correos: string[] = []
+        // Intentar obtener todos los correos dentro de este juego
+        // (esto puede fallar si el usuario no está autenticado)
+      let correos: string[] = []
       let juegoData: any = null
       let stockCount = 0
 
-      correosSnapshot.docs.forEach((correoDoc) => {
-        const data = correoDoc.data()
-        correos.push(correoDoc.id)
-        if (!juegoData) {
-          juegoData = data
-        }
-        if (Array.isArray(data.cuentas)) {
-          data.cuentas.forEach((cuenta: AccountOwner) => {
-            if (cuenta?.hasStock) {
-              stockCount++
-            }
-          })
-        }
-      })
+      try {
+        const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
+        const correosSnapshot = await getDocs(correosRef)
+
+        correosSnapshot.docs.forEach((correoDoc) => {
+          const data = correoDoc.data()
+          correos.push(correoDoc.id)
+          if (!juegoData) {
+            juegoData = data
+          }
+          if (Array.isArray(data.cuentas)) {
+            data.cuentas.forEach((cuenta: AccountOwner) => {
+              if (cuenta?.hasStock) {
+                stockCount++
+              }
+            })
+          }
+        })
+      } catch (error) {
+        // Si no tiene permisos (usuario no autenticado), usar datos del documento padre
+        console.log(`No se pudo acceder a correos de ${juegoId} (usuario no autenticado)`)
+        correos = []
+        stockCount = 0
+      }
 
       // Convertir ID del juego a nombre legible (ej: a_way_out -> A Way Out)
       const nombreFromId = juegoId
