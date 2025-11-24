@@ -143,10 +143,11 @@ const parsearArchivoTxt = (contenido: string): void => {
     
     const cuentas: AccountOwner[] = []
     lineas.forEach(linea => {
-      if (linea.includes('Principal PS4') || linea.includes('Secundaria PS4') || linea.includes('Principal PS5')) {
+      if (linea.includes('Principal PS4') || linea.includes('Secundaria PS4') || linea.includes('Principal PS5') || linea.includes('Secundaria PS5')) {
         let tipo: AccountType = 'Principal PS4'
         if (linea.includes('Secundaria PS4')) tipo = 'Secundaria PS4'
         else if (linea.includes('Principal PS5')) tipo = 'Principal PS5'
+        else if (linea.includes('Secundaria PS5')) tipo = 'Secundaria PS5'
         
         const esStock = /stock/i.test(linea)
         const telefonoMatch = linea.match(/\+593\s*\d+\s*\d+\s*\d+\s*\d+/)
@@ -521,6 +522,7 @@ const handleCancel = () => {
                 <option value="Principal PS4">Principal PS4</option>
                 <option value="Secundaria PS4">Secundaria PS4</option>
                 <option value="Principal PS5">Principal PS5</option>
+                <option value="Secundaria PS5">Secundaria PS5</option>
               </select>
               <label class="label cursor-pointer md:col-span-2 justify-center gap-2">
                 <span class="label-text text-xs">Stock</span>

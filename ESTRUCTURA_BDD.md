@@ -43,6 +43,11 @@ games/
                 │   │     tipo: "Principal PS5",
                 │   │     nombre: "Ej8 Ps5",
                 │   │     telefono: "+593 93 905 8256"
+                │   │   },
+                │   │   {
+                │   │     tipo: "Secundaria PS5",
+                │   │     nombre: "Usuario Ps5 Secundaria",
+                │   │     telefono: "+593 98 123 4567"
                 │   │   }
                 │   │ ]
                 │   ├── createdAt: Timestamp
@@ -152,6 +157,11 @@ games/PS4 & PS5/juegos/a_way_out/correos/theg.am.e.rsz.o.nec@gmail.com
       "tipo": "Principal PS5",
       "nombre": "Ej8 Ps5",
       "telefono": "+593 93 905 8256"
+    },
+    {
+      "tipo": "Secundaria PS5",
+      "nombre": "Usuario Ps5 Secundaria",
+      "telefono": "+593 98 123 4567"
     }
   ],
   "createdAt": "2024-11-12T00:00:00.000Z",
@@ -175,6 +185,7 @@ Cada correo puede tener múltiples cuentas, cada una con un tipo:
 - `Principal PS4` - Cuenta principal de PS4
 - `Secundaria PS4` - Cuenta secundaria de PS4
 - `Principal PS5` - Cuenta principal de PS5
+- `Secundaria PS5` - Cuenta secundaria de PS5
 
 Cada cuenta tiene:
 - **tipo**: El tipo de cuenta
@@ -271,6 +282,7 @@ Cada cuenta tiene:
      Principal PS4|19998 Ps4|+593 99 358 6097
      Secundaria PS4|Frank Fc PS4|+593 98 777 1379
      Principal PS5|Ej8 Ps5|+593 93 905 8256
+     Secundaria PS5|Usuario Ps5 Secundaria|+593 98 123 4567
      ```
 3. Click "Agregar Correo"
 
@@ -316,6 +328,7 @@ YtkdCZ
 Principal PS4|19998 Ps4|+593 99 358 6097
 Secundaria PS4|Frank Fc PS4 Ibarra|+593 98 777 1379
 Principal PS5|Ej8 Ps5|+593 93 905 8256
+Secundaria PS5|Usuario Ps5 Secundaria|+593 98 123 4567
 ```
 **Formato:** `tipo|nombre|teléfono` (separado por pipes `|`)
 
@@ -323,6 +336,7 @@ Principal PS5|Ej8 Ps5|+593 93 905 8256
 - `Principal PS4`
 - `Secundaria PS4`
 - `Principal PS5`
+- `Secundaria PS5`
 
 ## ⚠️ Notas Importantes
 
