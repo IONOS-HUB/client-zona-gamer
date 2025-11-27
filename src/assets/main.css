@@ -12,6 +12,47 @@
   color-scheme: dark;
 }
 
+/* ========================================
+   DESACTIVAR TODOS LOS EFECTOS HOVER
+   ======================================== */
+
+/* Desactivar TODOS los efectos hover que cambian tamaño/posición */
+*:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Desactivar efectos hover en elementos específicos */
+button:hover,
+a:hover,
+.btn:hover,
+.link:hover,
+div:hover,
+span:hover{
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Desactivar sombras en hover */
+*:hover {
+  box-shadow: inherit !important;
+}
+
+/* Desactivar efectos de grupo hover */
+.group:hover *,
+.group:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Permitir solo cambios de color/opacidad, pero sin transformaciones */
+*:hover {
+  transition-property: color, background-color, border-color, opacity !important;
+  transition-duration: 0.15s !important;
+  transition-timing-function: ease !important;
+  transition-delay: 0s !important;
+}
+
 /* Smooth scroll */
 html {
   scroll-behavior: smooth;
@@ -206,30 +247,30 @@ html {
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
 }
 
-/* Hover effects */
+/* Hover effects - DESACTIVADOS */
 .hover-lift {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: none;
 }
 
 .hover-lift:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  transform: none;
+  box-shadow: none;
 }
 
 .hover-scale {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: none;
 }
 
 .hover-scale:hover {
-  transform: scale(1.05);
+  transform: none;
 }
 
 .hover-glow {
-  transition: all 0.3s ease;
+  transition: none;
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 30px rgba(220, 38, 38, 0.6);
+  box-shadow: none;
 }
 
 /* ========================================
@@ -237,12 +278,148 @@ html {
    ======================================== */
 
 .card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: none;
 }
 
 .card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  transform: none;
+  box-shadow: none;
+}
+
+/* ========================================
+   TABLAS SIN EFECTOS HOVER DE ESCALA
+   ======================================== */
+
+/* Desactivar efectos hover de cards cuando contienen tablas */
+.card:has(.table):hover,
+.card:has(table):hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Excluir tablas de los efectos hover de cards */
+.card .table,
+.card table,
+.table,
+table,
+.table-zebra,
+table.table-zebra {
+  transform: none !important;
+}
+
+.card .table:hover,
+.card table:hover,
+.table:hover,
+table:hover,
+.table-zebra:hover,
+table.table-zebra:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Filas de tabla sin efectos de escala */
+.card .table tbody tr,
+.card table tbody tr,
+.table tbody tr,
+table tbody tr,
+.table-zebra tbody tr,
+table.table-zebra tbody tr {
+  transform: none !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.card .table tbody tr:hover,
+.card table tbody tr:hover,
+.table tbody tr:hover,
+table tbody tr:hover,
+.table-zebra tbody tr:hover,
+table.table-zebra tbody tr:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Celdas de tabla sin efectos */
+.card .table td,
+.card table td,
+.table td,
+table td,
+.table-zebra td,
+table.table-zebra td {
+  transform: none !important;
+}
+
+.card .table td:hover,
+.card table td:hover,
+.table td:hover,
+table td:hover,
+.table-zebra td:hover,
+table.table-zebra td:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Encabezados de tabla sin efectos */
+.card .table th,
+.card table th,
+.table th,
+table th,
+.table-zebra th,
+table.table-zebra th {
+  transform: none !important;
+}
+
+.card .table th:hover,
+.card table th:hover,
+.table th:hover,
+table th:hover,
+.table-zebra th:hover,
+table.table-zebra th:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Contenedores de tabla sin efectos */
+.card .table tbody,
+.card table tbody,
+.table tbody,
+table tbody {
+  transform: none !important;
+}
+
+.card .table tbody:hover,
+.card table tbody:hover,
+.table tbody:hover,
+table tbody:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Avatar e imágenes dentro de tablas sin efectos */
+.table .avatar,
+table .avatar,
+.table img,
+table img {
+  transform: none !important;
+}
+
+.table .avatar:hover,
+table .avatar:hover,
+.table img:hover,
+table img:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Badges dentro de tablas sin efectos */
+.table .badge,
+table .badge {
+  transform: none !important;
+}
+
+.table .badge:hover,
+table .badge:hover {
+  transform: none !important;
+  scale: 1 !important;
 }
 
 /* Card con reveal */
@@ -252,23 +429,11 @@ html {
 }
 
 .card-reveal::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  );
-  transition: left 0.5s ease;
+  display: none;
 }
 
 .card-reveal:hover::before {
-  left: 100%;
+  display: none;
 }
 
 /* ========================================
@@ -276,36 +441,86 @@ html {
    ======================================== */
 
 .btn {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: none;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  display: none;
 }
 
 .btn:hover::before {
-  width: 300px;
-  height: 300px;
+  display: none;
 }
 
 .btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  transform: none;
+  box-shadow: none;
 }
 
 .btn:active {
-  transform: translateY(0);
+  transform: none;
+}
+
+/* Excluir botones dentro de tablas de efectos hover */
+.table .btn,
+table .btn,
+.table-zebra .btn,
+table.table-zebra .btn,
+.table .btn:hover,
+table .btn:hover,
+.table-zebra .btn:hover,
+table.table-zebra .btn:hover {
+  transform: none !important;
+}
+
+.table .btn:active,
+table .btn:active,
+.table-zebra .btn:active,
+table.table-zebra .btn:active {
+  transform: none !important;
+}
+
+/* Excluir todos los elementos dentro de tablas de efectos de escala */
+.table *,
+table *,
+.table-zebra *,
+table.table-zebra * {
+  transform: none !important;
+}
+
+.table *:hover,
+table *:hover,
+.table-zebra *:hover,
+table.table-zebra *:hover {
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Asegurar que las tablas no tengan efectos de escala en ningún estado */
+.table,
+table,
+.table-zebra,
+table.table-zebra,
+.table tbody,
+table tbody,
+.table thead,
+table thead {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+.table:hover,
+table:hover,
+.table-zebra:hover,
+table.table-zebra:hover,
+.table tbody:hover,
+table tbody:hover,
+.table thead:hover,
+table thead:hover {
+  transform: none !important;
+  scale: 1 !important;
 }
 
 /* ========================================
@@ -323,11 +538,11 @@ html {
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #dc2626, #991b1b);
   border-radius: 5px;
-  transition: background 0.3s ease;
+  transition: none;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #991b1b, #7f1d1d);
+  background: linear-gradient(180deg, #dc2626, #991b1b);
 }
 
 /* ========================================
