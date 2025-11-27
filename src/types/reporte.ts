@@ -20,6 +20,11 @@ export interface Reporte {
   // Plataforma del mensaje generado
   plataformaMensaje: 'PS4' | 'PS5'
   
+  // Información del cliente/usuario del correo (asignada al generar mensaje)
+  clienteNombre?: string
+  clienteTelefono?: string
+  tipoCuenta?: 'Principal PS4' | 'Secundaria PS4' | 'Principal PS5' | 'Secundaria PS5'
+  
   // Metadata
   fechaGeneracion: Date
   createdAt: Date

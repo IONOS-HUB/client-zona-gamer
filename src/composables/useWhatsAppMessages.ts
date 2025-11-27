@@ -215,24 +215,30 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
     codigo1: string,
     codigo2: string
   ): Promise<boolean> => {
-    isGenerating.value = true
     error.value = null
 
     try {
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correoId)
+
+      console.log('🗑️ Eliminando códigos de Firestore...', {
+        plataforma,
+        juegoId,
+        correoId,
+        codigo1,
+        codigo2
+      })
 
       // Eliminar ambos códigos del array
       await updateDoc(correoRef, {
         codigosGenerados: arrayRemove(codigo1, codigo2)
       })
 
+      console.log('✅ Códigos eliminados de Firestore')
       return true
     } catch (err) {
-      console.error('Error eliminando códigos:', err)
+      console.error('❌ Error eliminando códigos:', err)
       error.value = err instanceof Error ? err.message : 'Error eliminando códigos'
       return false
-    } finally {
-      isGenerating.value = false
     }
   }
 
@@ -248,17 +254,34 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
     email: string,
     nombreUsuario: string,
     rol: 'admin' | 'employee',
-    versionSeleccionada?: 'PS4' | 'PS5'
+    versionSeleccionada?: 'PS4' | 'PS5',
+    clienteNombre?: string,
+    clienteTelefono?: string,
+    tipoCuenta?: 'Principal PS4' | 'Secundaria PS4' | 'Principal PS5' | 'Secundaria PS5'
   ): Promise<WhatsAppMessage | null> => {
+    isGenerating.value = true
+    error.value = null
+
     try {
+      console.log('🔄 Iniciando generación de mensaje...', {
+        correo: correo.correo,
+        juego: juegoNombre,
+        version: versionSeleccionada || 'auto',
+        codigosDisponibles: correo.codigosGenerados?.length || 0
+      })
+
       // Generar el mensaje
       const mensaje = versionSeleccionada
         ? generarMensajeWhatsAppConVersion(correo, versionSeleccionada)
         : generarMensajeWhatsApp(correo)
 
       if (!mensaje) {
+        const errorMsg = error.value || 'No se pudo generar el mensaje'
+        console.error('❌ Error generando mensaje:', errorMsg)
         return null
       }
+
+      console.log('✅ Mensaje generado, eliminando códigos...')
 
       // Eliminar los códigos de Firestore
       const eliminado = await eliminarCodigosUsados(
@@ -271,9 +294,13 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
 
       if (!eliminado) {
         error.value = 'El mensaje se generó pero hubo un error al eliminar los códigos'
+        console.warn('⚠️ Advertencia:', error.value)
+        // Continuar de todas formas, el mensaje ya se generó
+      } else {
+        console.log('✅ Códigos eliminados exitosamente')
       }
 
-      // Crear reporte del mensaje generado
+      // Crear reporte del mensaje generado (sin datos del cliente aún, se actualizará después)
       try {
         await crearReporte(
           uid,
@@ -288,19 +315,24 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
             codigo1: mensaje.codigoVerificacion1,
             codigo2: mensaje.codigoVerificacion2
           },
-          mensaje.version
+          mensaje.version,
+          clienteNombre,
+          clienteTelefono,
+          tipoCuenta
         )
         console.log('📝 Reporte guardado exitosamente')
       } catch (reporteError) {
-        console.error('Error guardando reporte:', reporteError)
+        console.error('❌ Error guardando reporte:', reporteError)
         // No fallar si el reporte falla, el mensaje ya se generó
       }
 
       return mensaje
     } catch (err) {
-      console.error('Error en proceso completo:', err)
+      console.error('❌ Error en proceso completo:', err)
       error.value = err instanceof Error ? err.message : 'Error en el proceso'
       return null
+    } finally {
+      isGenerating.value = false
     }
   }
 

@@ -7,7 +7,9 @@ import {
   getDocs,
   where,
   Timestamp,
-  limit as firestoreLimit
+  limit as firestoreLimit,
+  doc,
+  updateDoc
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import type { Reporte, ReporteFilters } from '@/types/reporte'
@@ -29,7 +31,10 @@ export function useReportes() {
     plataforma: 'PS4 & PS5' | 'PS4' | 'PS5',
     correoUtilizado: string,
     codigosUsados: { codigo1: string; codigo2: string },
-    plataformaMensaje: 'PS4' | 'PS5'
+    plataformaMensaje: 'PS4' | 'PS5',
+    clienteNombre?: string,
+    clienteTelefono?: string,
+    tipoCuenta?: 'Principal PS4' | 'Secundaria PS4' | 'Principal PS5' | 'Secundaria PS5'
   ): Promise<void> => {
     try {
       const reportesRef = collection(db, 'reportes')
@@ -45,12 +50,51 @@ export function useReportes() {
         correoUtilizado,
         codigosUsados,
         plataformaMensaje,
+        clienteNombre: clienteNombre || null,
+        clienteTelefono: clienteTelefono || null,
+        tipoCuenta: tipoCuenta || null,
         fechaGeneracion: Timestamp.now(),
         createdAt: Timestamp.now()
       }
 
       await addDoc(reportesRef, nuevoReporte)
-      console.log('✅ Reporte creado exitosamente')
+      console.log('✅ Reporte creado exitosamente', {
+        clienteNombre: clienteNombre || 'No asignado',
+        clienteTelefono: clienteTelefono || 'No asignado',
+        tipoCuenta: tipoCuenta || 'No asignado'
+      })
+    } catch (error) {
+      console.error('❌ Error creando reporte:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Actualizar un reporte existente con datos del cliente
+   * Nota: Esto requiere que las reglas de Firestore permitan actualizar reportes
+   */
+  const actualizarReporteConCliente = async (
+    reporteId: string,
+    clienteNombre: string,
+    clienteTelefono: string,
+    tipoCuenta: 'Principal PS4' | 'Secundaria PS4' | 'Principal PS5' | 'Secundaria PS5'
+  ): Promise<void> => {
+    try {
+      const reporteRef = doc(db, 'reportes', reporteId)
+      
+      await updateDoc(reporteRef, {
+        clienteNombre,
+        clienteTelefono,
+        tipoCuenta,
+        updatedAt: Timestamp.now()
+      })
+      
+      console.log('✅ Reporte actualizado con datos del cliente')
+    } catch (error) {
+      console.error('❌ Error actualizando reporte:', error)
+      throw error
+    }
+  }
     } catch (error) {
       console.error('❌ Error creando reporte:', error)
       throw error
@@ -96,6 +140,9 @@ export function useReportes() {
           correoUtilizado: data.correoUtilizado,
           codigosUsados: data.codigosUsados,
           plataformaMensaje: data.plataformaMensaje,
+          clienteNombre: data.clienteNombre || undefined,
+          clienteTelefono: data.clienteTelefono || undefined,
+          tipoCuenta: data.tipoCuenta || undefined,
           fechaGeneracion: data.fechaGeneracion?.toDate() || new Date(),
           createdAt: data.createdAt?.toDate() || new Date()
         } as Reporte
@@ -174,6 +221,7 @@ export function useReportes() {
     reportes,
     isLoadingReportes,
     crearReporte,
+    actualizarReporteConCliente,
     cargarReportes,
     obtenerEstadisticas
   }
