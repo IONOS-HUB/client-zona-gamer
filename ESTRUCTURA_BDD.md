@@ -12,7 +12,12 @@ games/
             └── correos/ (subcolección de correos)
                 ├── theg.am.e.rsz.o.nec@gmail.com/
                 │   ├── nombre: "A WAY OUT"
-                │   ├── costo: 6
+                │   ├── precios: {
+                │   │   ps4Principal: 6,
+                │   │   ps4Secundaria: 4,
+                │   │   ps5Principal: 8,
+                │   │   ps5Secundaria: 5
+                │   │ }
                 │   ├── version: "PS4"
                 │   ├── codigoMaster: "BSR6BUDLUZJUVUORBS4CIF45IULQVFHR6CDM3DXYAPQIW5XKDEFOB7N5RQNYZIPMFZ4XHKVVPUNW76IK5VFJHA4EBWI7VIGHVFE37ZI"
                 │   ├── codigosGenerados: [
@@ -56,7 +61,12 @@ games/
                 │
                 └── z.o.n.a.ec.l.a.t.a.m@gmail.com/
                     ├── nombre: "A WAY OUT"
-                    ├── costo: 6
+                    ├── precios: {
+                    │   ps4Principal: 6,
+                    │   ps4Secundaria: 4,
+                    │   ps5Principal: 8,
+                    │   ps5Secundaria: 5
+                    │ }
                     ├── version: "PS4"
                     ├── codigoMaster: "..."
                     ├── codigosGenerados: [...]
@@ -96,7 +106,12 @@ Documento contenedor del juego (ej: "a_way_out"). Este documento puede estar vac
 {
   correo: string (ID del documento)     // theg.am.e.rsz.o.nec@gmail.com
   nombre: string                        // "A WAY OUT"
-  costo: number                         // 6
+  precios: {                            // Objeto con los 4 precios
+    ps4Principal: number                // Precio para cuenta Principal PS4
+    ps4Secundaria: number               // Precio para cuenta Secundaria PS4
+    ps5Principal: number                // Precio para cuenta Principal PS5
+    ps5Secundaria: number               // Precio para cuenta Secundaria PS5
+  }
   version: string                       // "PS4 & PS5"
   codigoMaster: string                  // Código maestro principal
   codigosGenerados: string[]            // Array de códigos generados
@@ -126,7 +141,12 @@ games/PS4 & PS5/juegos/a_way_out/correos/theg.am.e.rsz.o.nec@gmail.com
 ```json
 {
   "nombre": "A WAY OUT",
-  "costo": 6,
+  "precios": {
+    "ps4Principal": 6,
+    "ps4Secundaria": 4,
+    "ps5Principal": 8,
+    "ps5Secundaria": 5
+  },
   "version": "PS4",
   "codigoMaster": "BSR6BUDLUZJUVUORBS4CIF45IULQVFHR6CDM3DXYAPQIW5XKDEFOB7N5RQNYZIPMFZ4XHKVVPUNW76IK5VFJHA4EBWI7VIGHVFE37ZI",
   "codigosGenerados": [
@@ -268,7 +288,11 @@ Cada cuenta tiene:
 1. Estando en la vista de correos, click "+ Agregar Correo"
 2. Llenar el formulario:
    - **Correo** (obligatorio): `theg.am.e.rsz.o.nec@gmail.com`
-   - **Precio**: `6`
+   - **Precios** (obligatorios):
+     - PS4 Principal: `6`
+     - PS4 Secundaria: `4`
+     - PS5 Principal: `8`
+     - PS5 Secundaria: `5`
    - **Código**: `90006`
    - **Código Master** (obligatorio): El código largo
    - **Códigos Generados**: Uno por línea
@@ -307,6 +331,17 @@ Cada cuenta tiene:
 **Eliminar un juego completo:**
 1. Click en botón "Eliminar" en la vista de juegos
 2. Confirmar eliminación (eliminará TODOS los correos del juego)
+
+## 💰 Sistema de Precios
+
+Cada juego ahora tiene **4 precios diferentes** según el tipo de cuenta:
+
+- **PS4 Principal**: Precio para cuentas principales de PS4
+- **PS4 Secundaria**: Precio para cuentas secundarias de PS4
+- **PS5 Principal**: Precio para cuentas principales de PS5
+- **PS5 Secundaria**: Precio para cuentas secundarias de PS5
+
+Estos precios se configuran al crear o editar un juego y se reflejan en el home, donde el usuario puede seleccionar el tipo de cuenta que desea comprar.
 
 ## 💡 Formato de Datos de Entrada
 
@@ -351,6 +386,8 @@ Secundaria PS5|Usuario Ps5 Secundaria|+593 98 123 4567
 5. **El correo no se puede editar**: Una vez creado, el correo es el ID del documento y no se puede cambiar.
 
 6. **Los códigos incluyen el master**: En la interfaz se muestra "X códigos" que incluye el master + los generados.
+
+7. **Sistema de precios múltiples**: Cada juego tiene 4 precios diferentes (PS4 Principal, PS4 Secundaria, PS5 Principal, PS5 Secundaria) que se configuran al crear el juego y se muestran en el home para que el usuario seleccione el tipo de cuenta que desea comprar.
 
 ## 🔍 Búsqueda
 

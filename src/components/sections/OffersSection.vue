@@ -50,8 +50,25 @@ const badgeClasses = computed(() => {
     : 'badge-success'
 })
 
+const selectedAccountType = ref<import('@/types/game').AccountType>('Principal PS4')
+
+const getPrice = (game: GameSummary): number => {
+  switch (selectedAccountType.value) {
+    case 'Principal PS4':
+      return game.precios.ps4Principal
+    case 'Secundaria PS4':
+      return game.precios.ps4Secundaria
+    case 'Principal PS5':
+      return game.precios.ps5Principal
+    case 'Secundaria PS5':
+      return game.precios.ps5Secundaria
+    default:
+      return game.precios.ps4Principal
+  }
+}
+
 const addToCart = (game: GameSummary) => {
-  cartStore.addToCart(game, 1)
+  cartStore.addToCart(game, 1, selectedAccountType.value)
 }
 
 const nextSlide = () => {
@@ -318,12 +335,23 @@ onBeforeUnmount(() => {
                       {{ game.nombre }}
                     </h3>
                     
-                    <!-- Precio -->
-                    <div class="flex items-center gap-4 mb-6">
+                    <!-- Selector de tipo de cuenta y precio -->
+                    <div class="flex flex-col gap-4 mb-6">
+                      <div class="flex items-center gap-2">
+                        <select 
+                          v-model="selectedAccountType" 
+                          class="select select-bordered select-sm bg-base-100/80 backdrop-blur-md"
+                        >
+                          <option value="Principal PS4">PS4 Principal</option>
+                          <option value="Secundaria PS4">PS4 Secundaria</option>
+                          <option value="Principal PS5">PS5 Principal</option>
+                          <option value="Secundaria PS5">PS5 Secundaria</option>
+                        </select>
+                      </div>
                       <div class="bg-error/20 backdrop-blur-md px-6 py-3 rounded-xl border border-error/30 hover:bg-error/30 transition-colors">
                         <p class="text-sm text-error font-medium mb-1">PRECIO ESPECIAL</p>
                         <p class="text-4xl font-black text-white">
-                          {{ formatPrice(game.costo) }}
+                          {{ formatPrice(getPrice(game)) }}
                         </p>
                       </div>
                     </div>
@@ -440,7 +468,7 @@ onBeforeUnmount(() => {
               <div class="absolute inset-0 bg-linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.4)) opacity-0 group-hover:opacity-100 transition-opacity">
                 <div class="absolute bottom-0 left-0 right-0 p-2">
                   <p class="text-xs font-bold text-white truncate mb-1">{{ game.nombre }}</p>
-                  <p class="text-sm font-black text-error">{{ formatPrice(game.costo) }}</p>
+                  <p class="text-sm font-black text-error">{{ formatPrice(getPrice(game)) }}</p>
                 </div>
               </div>
             </div>

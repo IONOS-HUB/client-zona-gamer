@@ -84,7 +84,9 @@ const juegosFiltrados = computed(() => {
         comparacion = a.nombre.localeCompare(b.nombre)
         break
       case 'costo':
-        comparacion = a.costo - b.costo
+        const precioMinA = Math.min(a.precios.ps4Principal, a.precios.ps4Secundaria, a.precios.ps5Principal, a.precios.ps5Secundaria)
+        const precioMinB = Math.min(b.precios.ps4Principal, b.precios.ps4Secundaria, b.precios.ps5Principal, b.precios.ps5Secundaria)
+        comparacion = precioMinA - precioMinB
         break
       case 'correos':
         comparacion = a.totalCorreos - b.totalCorreos
@@ -380,7 +382,10 @@ defineExpose({
           <div class="card-body">
             <h2 class="card-title">{{ juego.nombre }}</h2>
             <div class="flex flex-wrap gap-2 mt-2">
-              <div class="badge badge-primary">{{ formatearPrecio(juego.costo) }}</div>
+              <div class="badge badge-primary badge-sm">PS4 P: {{ formatearPrecio(juego.precios.ps4Principal) }}</div>
+              <div class="badge badge-secondary badge-sm">PS4 S: {{ formatearPrecio(juego.precios.ps4Secundaria) }}</div>
+              <div class="badge badge-success badge-sm">PS5 P: {{ formatearPrecio(juego.precios.ps5Principal) }}</div>
+              <div class="badge badge-accent badge-sm">PS5 S: {{ formatearPrecio(juego.precios.ps5Secundaria) }}</div>
               <div class="badge badge-secondary">{{ juego.version }}</div>
               <div v-if="juego.tipoPromocion === 'oferta'" class="badge badge-warning">Oferta</div>
               <div v-if="juego.tipoPromocion === 'promocion'" class="badge badge-info">Promoción</div>
@@ -401,7 +406,7 @@ defineExpose({
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-2xl font-bold">{{ juegoSeleccionado.nombre }}</h2>
-              <p class="text-base-content/60 mt-1">{{ formatearPrecio(juegoSeleccionado.costo) }} • {{ juegoSeleccionado.version }}</p>
+              <p class="text-base-content/60 mt-1">{{ formatearPrecio(Math.min(juegoSeleccionado.precios.ps4Principal, juegoSeleccionado.precios.ps4Secundaria, juegoSeleccionado.precios.ps5Principal, juegoSeleccionado.precios.ps5Secundaria)) }} • {{ juegoSeleccionado.version }}</p>
             </div>
             <button @click="volverAJuegos" class="btn btn-ghost">← Volver a Juegos</button>
           </div>

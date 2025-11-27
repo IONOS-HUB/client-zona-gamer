@@ -109,7 +109,9 @@ const juegosFiltrados = computed(() => {
         compareValue = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
         break
       case 'costo':
-        compareValue = a.costo - b.costo
+        const precioMinA = Math.min(a.precios.ps4Principal, a.precios.ps4Secundaria, a.precios.ps5Principal, a.precios.ps5Secundaria)
+        const precioMinB = Math.min(b.precios.ps4Principal, b.precios.ps4Secundaria, b.precios.ps5Principal, b.precios.ps5Secundaria)
+        compareValue = precioMinA - precioMinB
         break
       case 'correos':
         compareValue = a.totalCorreos - b.totalCorreos
@@ -136,14 +138,18 @@ const estadisticas = computed(() => {
   const juegosEnPromocion = filtered.filter(j => j.tipoPromocion === 'promocion').length
   const totalCorreos = filtered.reduce((sum, j) => sum + j.totalCorreos, 0)
   const totalStock = filtered.reduce((sum, j) => sum + (j.stockAccounts || 0), 0)
+  const getPrecioMinimo = (j: GameSummary): number => {
+    return Math.min(j.precios.ps4Principal, j.precios.ps4Secundaria, j.precios.ps5Principal, j.precios.ps5Secundaria)
+  }
+  
   const costoPromedio = filtered.length > 0 
-    ? filtered.reduce((sum, j) => sum + j.costo, 0) / filtered.length 
+    ? filtered.reduce((sum, j) => sum + getPrecioMinimo(j), 0) / filtered.length 
     : 0
   const costoMinimo = filtered.length > 0 
-    ? Math.min(...filtered.map(j => j.costo)) 
+    ? Math.min(...filtered.map(j => getPrecioMinimo(j))) 
     : 0
   const costoMaximo = filtered.length > 0 
-    ? Math.max(...filtered.map(j => j.costo)) 
+    ? Math.max(...filtered.map(j => getPrecioMinimo(j))) 
     : 0
 
   return {

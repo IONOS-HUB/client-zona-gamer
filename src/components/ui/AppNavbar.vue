@@ -191,11 +191,7 @@ const clearSearch = (): void => {
 }
 
 const getItemPrice = (item: typeof cartStore.items[0]): number => {
-  // Calcular precio con descuento si aplica
-  if (item.descuento && item.descuento > 0) {
-    return item.costo * (1 - item.descuento / 100)
-  }
-  return item.costo
+  return cartStore.getItemPrice(item)
 }
 
 const handleQuickCheckout = (): void => {
@@ -212,11 +208,14 @@ const handleQuickCheckout = (): void => {
     mensaje += `   Plataforma: ${item.version}%0A`
     mensaje += `   Cantidad: ${item.quantity}%0A`
     
+    const precioBase = cartStore.getItemPrice(item) / (item.descuento && item.descuento > 0 ? (1 - item.descuento / 100) : 1)
     if (item.descuento && item.descuento > 0) {
-      mensaje += `   Precio original: $${item.costo.toFixed(2)}%0A`
+      mensaje += `   Tipo de cuenta: ${item.selectedAccountType}%0A`
+      mensaje += `   Precio original: $${precioBase.toFixed(2)}%0A`
       mensaje += `   Descuento: ${item.descuento}%%0A`
       mensaje += `   Precio con descuento: $${precioUnitario.toFixed(2)} c/u%0A`
     } else {
+      mensaje += `   Tipo de cuenta: ${item.selectedAccountType}%0A`
       mensaje += `   Precio: $${precioUnitario.toFixed(2)} c/u%0A`
     }
     

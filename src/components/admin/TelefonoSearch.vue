@@ -152,7 +152,7 @@ const formatearFecha = (fecha: Date | string): string => {
               <h4 class="font-semibold mb-2">Información del Juego</h4>
               <div class="space-y-1 text-sm">
                 <p><span class="font-medium">Juego:</span> {{ resultado.juego.nombre }}</p>
-                <p><span class="font-medium">Precio:</span> {{ formatearPrecio(resultado.juego.costo) }}</p>
+                <p><span class="font-medium">Precio:</span> {{ formatearPrecio(Math.min(resultado.juego.precios.ps4Principal, resultado.juego.precios.ps4Secundaria, resultado.juego.precios.ps5Principal, resultado.juego.precios.ps5Secundaria)) }}</p>
                 <p><span class="font-medium">Versión:</span> {{ resultado.juego.version }}</p>
                 <button 
                   @click="emit('verDetallesJuego', resultado.juego.id)"

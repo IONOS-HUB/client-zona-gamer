@@ -1,9 +1,10 @@
 import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
-import type { GameSummary } from '@/types/game'
+import type { GameSummary, AccountType } from '@/types/game'
 
 export interface CartItem extends GameSummary {
   quantity: number
+  selectedAccountType: AccountType
 }
 
 const CART_STORAGE_KEY = 'zona_gamer_cart'
@@ -13,7 +14,23 @@ const loadCartFromStorage = (): CartItem[] => {
   try {
     const stored = localStorage.getItem(CART_STORAGE_KEY)
     if (stored) {
-      return JSON.parse(stored) as CartItem[]
+      const items = JSON.parse(stored) as any[]
+      // Migración: agregar selectedAccountType si no existe
+      return items.map(item => {
+        if (!item.selectedAccountType) {
+          item.selectedAccountType = 'Principal PS4' // Valor por defecto
+        }
+        // Migración: asegurar que precios exista
+        if (!item.precios && item.costo !== undefined) {
+          item.precios = {
+            ps4Principal: item.costo,
+            ps4Secundaria: item.costo,
+            ps5Principal: item.costo,
+            ps5Secundaria: item.costo
+          }
+        }
+        return item as CartItem
+      })
     }
   } catch (error) {
     console.error('Error cargando carrito desde localStorage:', error)
@@ -40,10 +57,27 @@ export const useCartStore = defineStore('cart', () => {
 
   const totalPrice = computed(() => {
     return items.value.reduce((total, item) => {
+      // Obtener el precio según el tipo de cuenta seleccionado
+      let precioBase = 0
+      switch (item.selectedAccountType) {
+        case 'Principal PS4':
+          precioBase = item.precios.ps4Principal
+          break
+        case 'Secundaria PS4':
+          precioBase = item.precios.ps4Secundaria
+          break
+        case 'Principal PS5':
+          precioBase = item.precios.ps5Principal
+          break
+        case 'Secundaria PS5':
+          precioBase = item.precios.ps5Secundaria
+          break
+      }
+      
       // Calcular precio con descuento si aplica
       const precioUnitario = item.descuento && item.descuento > 0
-        ? item.costo * (1 - item.descuento / 100)
-        : item.costo
+        ? precioBase * (1 - item.descuento / 100)
+        : precioBase
       return total + (precioUnitario * item.quantity)
     }, 0)
   })
@@ -60,17 +94,20 @@ export const useCartStore = defineStore('cart', () => {
   )
 
   // Actions
-  const addToCart = (game: GameSummary, quantity: number = 1): void => {
-    const existingItem = items.value.find(item => item.id === game.id)
+  const addToCart = (game: GameSummary, quantity: number = 1, accountType: AccountType = 'Principal PS4'): void => {
+    const existingItem = items.value.find(item => 
+      item.id === game.id && item.selectedAccountType === accountType
+    )
     
     if (existingItem) {
-      // Si el juego ya está en el carrito, aumentar cantidad (sin límite)
+      // Si el juego con el mismo tipo de cuenta ya está en el carrito, aumentar cantidad
       existingItem.quantity += quantity
     } else {
-      // Si es nuevo, agregarlo con la cantidad especificada (sin límite)
+      // Si es nuevo o es diferente tipo de cuenta, agregarlo como nuevo item
       items.value.push({
         ...game,
-        quantity: quantity
+        quantity: quantity,
+        selectedAccountType: accountType
       })
     }
   }
@@ -82,8 +119,11 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
-  const updateQuantity = (gameId: string, quantity: number): void => {
-    const item = items.value.find(item => item.id === gameId)
+  const updateQuantity = (gameId: string, quantity: number, accountType?: AccountType): void => {
+    const item = accountType 
+      ? items.value.find(item => item.id === gameId && item.selectedAccountType === accountType)
+      : items.value.find(item => item.id === gameId)
+    
     if (item) {
       if (quantity <= 0) {
         removeFromCart(gameId)
@@ -99,13 +139,41 @@ export const useCartStore = defineStore('cart', () => {
     // El watcher se encargará de limpiar localStorage automáticamente
   }
 
-  const isInCart = (gameId: string): boolean => {
+  const isInCart = (gameId: string, accountType?: AccountType): boolean => {
+    if (accountType) {
+      return items.value.some(item => item.id === gameId && item.selectedAccountType === accountType)
+    }
     return items.value.some(item => item.id === gameId)
   }
 
-  const getItemQuantity = (gameId: string): number => {
-    const item = items.value.find(item => item.id === gameId)
+  const getItemQuantity = (gameId: string, accountType?: AccountType): number => {
+    const item = accountType
+      ? items.value.find(item => item.id === gameId && item.selectedAccountType === accountType)
+      : items.value.find(item => item.id === gameId)
     return item?.quantity || 0
+  }
+  
+  const getItemPrice = (item: CartItem): number => {
+    let precioBase = 0
+    switch (item.selectedAccountType) {
+      case 'Principal PS4':
+        precioBase = item.precios.ps4Principal
+        break
+      case 'Secundaria PS4':
+        precioBase = item.precios.ps4Secundaria
+        break
+      case 'Principal PS5':
+        precioBase = item.precios.ps5Principal
+        break
+      case 'Secundaria PS5':
+        precioBase = item.precios.ps5Secundaria
+        break
+    }
+    
+    if (item.descuento && item.descuento > 0) {
+      return precioBase * (1 - item.descuento / 100)
+    }
+    return precioBase
   }
 
   return {
@@ -118,7 +186,8 @@ export const useCartStore = defineStore('cart', () => {
     updateQuantity,
     clearCart,
     isInCart,
-    getItemQuantity
+    getItemQuantity,
+    getItemPrice
   }
 })
 

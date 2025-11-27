@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { GameSummary } from '@/types/game'
+import type { GameSummary, AccountType } from '@/types/game'
 import { useCartStore } from '@/stores/cart'
 
 interface Props {
@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const cartStore = useCartStore()
 const quantity = ref(1)
+const selectedAccountType = ref<AccountType>('Principal PS4')
 
 const formatearPrecio = (precio: number): string => {
   return new Intl.NumberFormat('es-US', {
@@ -22,15 +23,54 @@ const formatearPrecio = (precio: number): string => {
   }).format(precio)
 }
 
-const precioConDescuento = computed(() => {
-  if (props.game.descuento && props.game.descuento > 0) {
-    return props.game.costo * (1 - props.game.descuento / 100)
+// Obtener el precio según el tipo de cuenta seleccionado
+const precioActual = computed(() => {
+  let precio = 0
+  switch (selectedAccountType.value) {
+    case 'Principal PS4':
+      precio = props.game.precios.ps4Principal
+      break
+    case 'Secundaria PS4':
+      precio = props.game.precios.ps4Secundaria
+      break
+    case 'Principal PS5':
+      precio = props.game.precios.ps5Principal
+      break
+    case 'Secundaria PS5':
+      precio = props.game.precios.ps5Secundaria
+      break
   }
-  return props.game.costo
+  return precio
 })
 
-const isInCart = computed(() => cartStore.isInCart(props.game.id))
-const currentQuantity = computed(() => cartStore.getItemQuantity(props.game.id))
+const precioConDescuento = computed(() => {
+  if (props.game.descuento && props.game.descuento > 0) {
+    return precioActual.value * (1 - props.game.descuento / 100)
+  }
+  return precioActual.value
+})
+
+// Determinar qué tipos de cuenta están disponibles según la versión del juego
+const availableAccountTypes = computed<AccountType[]>(() => {
+  const types: AccountType[] = []
+  if (props.game.version === 'PS4' || props.game.version === 'PS4 & PS5') {
+    types.push('Principal PS4', 'Secundaria PS4')
+  }
+  if (props.game.version === 'PS5' || props.game.version === 'PS4 & PS5') {
+    types.push('Principal PS5', 'Secundaria PS5')
+  }
+  return types.length > 0 ? types : ['Principal PS4', 'Secundaria PS4', 'Principal PS5', 'Secundaria PS5']
+})
+
+// Asegurar que el tipo seleccionado esté disponible
+watch(() => props.game.version, () => {
+  if (availableAccountTypes.value.length > 0 && !availableAccountTypes.value.includes(selectedAccountType.value)) {
+    selectedAccountType.value = availableAccountTypes.value[0] || 'Principal PS4'
+  }
+}, { immediate: true })
+
+const isInCart = computed(() => cartStore.isInCart(props.game.id, selectedAccountType.value))
+const currentQuantity = computed(() => cartStore.getItemQuantity(props.game.id, selectedAccountType.value))
 
 // Resetear quantity a 1 cuando el juego sale del carrito
 watch(isInCart, (newValue, oldValue) => {
@@ -66,10 +106,10 @@ const handleAddToCart = (): void => {
   if (isInCart.value) {
     // Si ya está en el carrito, agregar la cantidad seleccionada adicional
     const nuevaCantidadTotal = currentQuantity.value + quantity.value
-    cartStore.updateQuantity(props.game.id, nuevaCantidadTotal)
+    cartStore.updateQuantity(props.game.id, nuevaCantidadTotal, selectedAccountType.value)
   } else {
-    // Si no está en el carrito, agregar con la cantidad seleccionada
-    cartStore.addToCart(props.game, quantity.value)
+    // Si no está en el carrito, agregar con la cantidad seleccionada y tipo de cuenta
+    cartStore.addToCart(props.game, quantity.value, selectedAccountType.value)
   }
   // Resetear a 1 después de agregar
   quantity.value = 1
@@ -168,6 +208,22 @@ const stars = computed(() => {
         <span>{{ currentQuantity }} en carrito</span>
       </div>
 
+      <!-- Selector de tipo de cuenta -->
+      <div v-if="showAddToCart && availableAccountTypes.length > 1" class="form-control">
+        <select 
+          v-model="selectedAccountType" 
+          class="select select-bordered select-xs text-[10px]"
+        >
+          <option 
+            v-for="type in availableAccountTypes" 
+            :key="type" 
+            :value="type"
+          >
+            {{ type }}
+          </option>
+        </select>
+      </div>
+
       <!-- Precio y cantidad -->
       <div class="flex items-center justify-between gap-2">
         <!-- Precio -->
@@ -176,7 +232,7 @@ const stars = computed(() => {
             {{ formatearPrecio(precioConDescuento) }}
           </div>
           <div v-if="game.descuento && game.descuento > 0" class="text-[10px] text-base-content/50 line-through">
-            {{ formatearPrecio(game.costo) }}
+            {{ formatearPrecio(precioActual) }}
           </div>
         </div>
 

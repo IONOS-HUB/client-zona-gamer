@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useGames } from '@/composables/useGames'
 import { useCartStore } from '@/stores/cart'
 import GameCard from '@/components/ui/GameCard.vue'
+import type { GameSummary } from '@/types/game'
 import { Package, Sparkles } from 'lucide-vue-next'
 
 const { games } = useGames()
@@ -42,9 +43,19 @@ const combos = computed<Combo[]>(() => {
       ? [juego1.id, juego2.id, juego3.id]
       : [juego1.id, juego2.id]
     
+    // Usar el precio mínimo disponible de cada juego
+    const getPrecioMinimo = (juego: GameSummary): number => {
+      return Math.min(
+        juego.precios.ps4Principal,
+        juego.precios.ps4Secundaria,
+        juego.precios.ps5Principal,
+        juego.precios.ps5Secundaria
+      )
+    }
+    
     const precioTotal = juego3
-      ? juego1.costo + juego2.costo + juego3.costo
-      : juego1.costo + juego2.costo
+      ? getPrecioMinimo(juego1) + getPrecioMinimo(juego2) + getPrecioMinimo(juego3)
+      : getPrecioMinimo(juego1) + getPrecioMinimo(juego2)
     
     const descuento = 15 + (i * 5) // 15%, 20%, 25%
     const precioConDescuento = precioTotal * (1 - descuento / 100)

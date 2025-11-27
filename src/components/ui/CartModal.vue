@@ -40,16 +40,16 @@ const handleCheckout = (): void => {
   emit('checkout')
 }
 
-const incrementQuantity = (gameId: string, currentQuantity: number): void => {
-  cartStore.updateQuantity(gameId, currentQuantity + 1)
+const incrementQuantity = (item: typeof cartStore.items[0]): void => {
+  cartStore.updateQuantity(item.id, item.quantity + 1, item.selectedAccountType)
 }
 
-const decrementQuantity = (gameId: string, currentQuantity: number): void => {
-  if (currentQuantity > 1) {
-    cartStore.updateQuantity(gameId, currentQuantity - 1)
+const decrementQuantity = (item: typeof cartStore.items[0]): void => {
+  if (item.quantity > 1) {
+    cartStore.updateQuantity(item.id, item.quantity - 1, item.selectedAccountType)
   } else {
     // Si la cantidad es 1, mostrar confirmación para eliminar
-    iniciarEliminacion(gameId)
+    iniciarEliminacion(item.id)
   }
 }
 
@@ -85,10 +85,11 @@ const cancelarVaciarCarrito = (): void => {
 }
 
 const getItemTotalPrice = (item: typeof cartStore.items[0]): number => {
-  if (item.descuento && item.descuento > 0) {
-    return item.costo * (1 - item.descuento / 100)
-  }
-  return item.costo
+  return cartStore.getItemPrice(item) * item.quantity
+}
+
+const getItemUnitPrice = (item: typeof cartStore.items[0]): number => {
+  return cartStore.getItemPrice(item)
 }
 
 const getItemName = (gameId: string): string => {
@@ -154,14 +155,17 @@ const getItemName = (gameId: string): string => {
               <div class="flex-1 space-y-3">
                 <div>
                   <h4 class="font-bold text-lg mb-1 group-hover:text-error transition-colors">{{ item.nombre }}</h4>
-                  <p class="text-sm badge badge-ghost">{{ item.version }}</p>
+                  <div class="flex flex-wrap gap-2 mt-1">
+                    <p class="text-sm badge badge-ghost">{{ item.version }}</p>
+                    <p class="text-sm badge badge-primary">{{ item.selectedAccountType }}</p>
+                  </div>
                 </div>
                 
                 <div class="flex items-center justify-between">
                   <!-- Cantidad con mejor diseño -->
                   <div class="flex items-center gap-1 bg-base-300 rounded-full p-1">
                     <button 
-                      @click="decrementQuantity(item.id, item.quantity)"
+                      @click="decrementQuantity(item)"
                       class="btn btn-xs btn-circle hover:bg-error hover:text-white transition-all duration-300"
                       :disabled="item.quantity <= 0"
                       :aria-label="`Disminuir cantidad de ${item.nombre}`"
@@ -175,7 +179,7 @@ const getItemName = (gameId: string): string => {
                     <span class="font-bold px-4 text-lg min-w-[3rem] text-center">{{ item.quantity }}</span>
                     
                     <button 
-                      @click="incrementQuantity(item.id, item.quantity)"
+                      @click="incrementQuantity(item)"
                       class="btn btn-xs btn-circle hover:bg-success hover:text-white transition-all duration-300"
                       :aria-label="`Aumentar cantidad de ${item.nombre}`"
                       title="Aumentar cantidad"
@@ -189,10 +193,10 @@ const getItemName = (gameId: string): string => {
                   <!-- Precio mejorado -->
                   <div class="text-right">
                     <p class="text-xl font-black text-gradient">
-                      {{ formatearPrecio(getItemTotalPrice(item) * item.quantity) }}
+                      {{ formatearPrecio(getItemTotalPrice(item)) }}
                     </p>
                     <p class="text-xs text-base-content/60">
-                      {{ formatearPrecio(getItemTotalPrice(item)) }} c/u
+                      {{ formatearPrecio(getItemUnitPrice(item)) }} c/u
                     </p>
                   </div>
                 </div>

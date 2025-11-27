@@ -6,13 +6,15 @@ import type { GameEmailAccount, AccountOwner, GamePlatform, AccountType } from '
 export interface EmailFormData {
   correo: string
   nombre: string
-  costo: number
+  precios: import('@/types/game').GamePrices
   version: GamePlatform
   codigoMaster: string
   codigo: string
   codigosGenerados: string[]
   cuentas: AccountOwner[]
   saldo?: number
+  // Legacy: mantener costo para compatibilidad
+  costo?: number
 }
 
 interface Props {
@@ -20,7 +22,7 @@ interface Props {
   email?: GameEmailAccount | null
   gameName: string
   gameVersion: GamePlatform
-  gameCosto: number
+  gamePrecios: import('@/types/game').GamePrices
   isLoading?: boolean
   error?: string
 }
@@ -40,7 +42,12 @@ const emit = defineEmits<{
 const formData = ref<EmailFormData>({
   correo: '',
   nombre: '',
-  costo: 0,
+  precios: {
+    ps4Principal: 0,
+    ps4Secundaria: 0,
+    ps5Principal: 0,
+    ps5Secundaria: 0
+  },
   version: 'PS4 & PS5',
   codigoMaster: '',
   codigo: '',
@@ -71,7 +78,13 @@ watch(() => props.show, (newVal) => {
       formData.value = {
         correo: props.email.correo,
         nombre: props.email.nombre,
-        costo: props.email.costo,
+        precios: props.email.precios || {
+          ps4Principal: props.email.costo || 0,
+          ps4Secundaria: props.email.costo || 0,
+          ps5Principal: props.email.costo || 0,
+          ps5Secundaria: props.email.costo || 0
+        },
+        costo: props.email.costo, // Legacy
         version: props.email.version,
         codigoMaster: props.email.codigoMaster,
         codigo: props.email.codigo,
@@ -84,7 +97,7 @@ watch(() => props.show, (newVal) => {
       formData.value = {
         correo: '',
         nombre: props.gameName,
-        costo: props.gameCosto,
+        precios: { ...props.gamePrecios },
         version: props.gameVersion,
         codigoMaster: '',
         codigo: '',
@@ -382,17 +395,60 @@ const handleCancel = () => {
                 />
               </div>
 
-              <div class="form-control">
+              <div class="form-control md:col-span-2">
                 <label class="label">
-                  <span class="label-text font-semibold">Precio</span>
+                  <span class="label-text font-semibold">Precios (USD)</span>
                 </label>
-                <input
-                  v-model.number="formData.costo"
-                  type="number"
-                  step="0.01"
-                  class="input input-bordered"
-                  disabled
-                />
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="form-control">
+                    <label class="label py-0">
+                      <span class="label-text text-xs">PS4 Principal</span>
+                    </label>
+                    <input
+                      v-model.number="formData.precios.ps4Principal"
+                      type="number"
+                      step="0.01"
+                      class="input input-bordered input-sm"
+                      disabled
+                    />
+                  </div>
+                  <div class="form-control">
+                    <label class="label py-0">
+                      <span class="label-text text-xs">PS4 Secundaria</span>
+                    </label>
+                    <input
+                      v-model.number="formData.precios.ps4Secundaria"
+                      type="number"
+                      step="0.01"
+                      class="input input-bordered input-sm"
+                      disabled
+                    />
+                  </div>
+                  <div class="form-control">
+                    <label class="label py-0">
+                      <span class="label-text text-xs">PS5 Principal</span>
+                    </label>
+                    <input
+                      v-model.number="formData.precios.ps5Principal"
+                      type="number"
+                      step="0.01"
+                      class="input input-bordered input-sm"
+                      disabled
+                    />
+                  </div>
+                  <div class="form-control">
+                    <label class="label py-0">
+                      <span class="label-text text-xs">PS5 Secundaria</span>
+                    </label>
+                    <input
+                      v-model.number="formData.precios.ps5Secundaria"
+                      type="number"
+                      step="0.01"
+                      class="input input-bordered input-sm"
+                      disabled
+                    />
+                  </div>
+                </div>
               </div>
 
               <div class="form-control">

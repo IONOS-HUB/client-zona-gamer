@@ -139,7 +139,7 @@ const juegosFiltrados = computed(() => {
         compareValue = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
         break
       case 'costo':
-        compareValue = a.costo - b.costo
+        compareValue = (a.costo || 0) - (b.costo || 0)
         break
       case 'correos':
         compareValue = a.totalCorreos - b.totalCorreos
@@ -369,13 +369,14 @@ const handleSaveGame = async (data: GameFormData): Promise<void> => {
         nombre: data.nombre,
         foto: data.foto,
         version: data.version,
-        tipoPromocion: data.tipoPromocion
+        tipoPromocion: data.tipoPromocion,
+        precios: data.precios
       })
       successMessage.value = 'Juego actualizado exitosamente'
     } else {
       // Crear nuevo juego
       const isOffert = data.tipoPromocion === 'oferta'
-      await crearJuego('PS4 & PS5', data.nombre, data.foto, isOffert, data.version)
+      await crearJuego('PS4 & PS5', data.nombre, data.foto, isOffert, data.version, data.precios)
       successMessage.value = 'Juego creado exitosamente'
     }
     
@@ -420,7 +421,7 @@ const handleSaveEmail = async (data: EmailFormData): Promise<void> => {
       // Actualizar correo existente
       await actualizarCorreoJuego('PS4 & PS5', juegoSeleccionado.value.id, data.correo, {
         nombre: data.nombre,
-        costo: data.costo,
+        precios: data.precios,
         version: data.version,
         codigoMaster: data.codigoMaster,
         codigo: data.codigo,
@@ -434,7 +435,7 @@ const handleSaveEmail = async (data: EmailFormData): Promise<void> => {
       // Crear nuevo correo
       await crearCorreoJuego('PS4 & PS5', juegoSeleccionado.value.id, data.correo, {
         nombre: data.nombre,
-        costo: data.costo,
+        precios: data.precios,
         version: data.version,
         codigoMaster: data.codigoMaster,
         codigo: data.codigo,
@@ -815,7 +816,14 @@ defineExpose({
                   <div class="font-bold">{{ juego.nombre }}</div>
                   <div class="text-sm opacity-50">ID: {{ juego.id }}</div>
                 </td>
-                <td><span class="badge badge-success">{{ formatearPrecio(juego.costo) }}</span></td>
+                <td>
+                  <div class="flex flex-col gap-1">
+                    <span class="badge badge-sm badge-primary">PS4 P: {{ formatearPrecio(juego.precios.ps4Principal) }}</span>
+                    <span class="badge badge-sm badge-secondary">PS4 S: {{ formatearPrecio(juego.precios.ps4Secundaria) }}</span>
+                    <span class="badge badge-sm badge-success">PS5 P: {{ formatearPrecio(juego.precios.ps5Principal) }}</span>
+                    <span class="badge badge-sm badge-accent">PS5 S: {{ formatearPrecio(juego.precios.ps5Secundaria) }}</span>
+                  </div>
+                </td>
                 <td><span class="badge badge-info">{{ juego.totalCorreos }}</span></td>
                 <td>
                   <span class="badge" :class="(juego.stockAccounts || 0) > 0 ? 'badge-primary' : 'badge-ghost'">
@@ -962,7 +970,15 @@ defineExpose({
               <div class="grid grid-cols-2 gap-4">
                 <div><span class="font-semibold">Correo:</span><p class="font-mono text-sm">{{ selectedEmailDetails.correo }}</p></div>
                 <div><span class="font-semibold">Nombre:</span><p>{{ selectedEmailDetails.nombre }}</p></div>
-                <div><span class="font-semibold">Precio:</span><p>{{ formatearPrecio(selectedEmailDetails.costo) }}</p></div>
+                <div class="md:col-span-2">
+                  <span class="font-semibold">Precios:</span>
+                  <div class="grid grid-cols-2 gap-2 mt-1">
+                    <div class="badge badge-primary">PS4 Principal: {{ formatearPrecio(selectedEmailDetails.precios.ps4Principal) }}</div>
+                    <div class="badge badge-secondary">PS4 Secundaria: {{ formatearPrecio(selectedEmailDetails.precios.ps4Secundaria) }}</div>
+                    <div class="badge badge-success">PS5 Principal: {{ formatearPrecio(selectedEmailDetails.precios.ps5Principal) }}</div>
+                    <div class="badge badge-accent">PS5 Secundaria: {{ formatearPrecio(selectedEmailDetails.precios.ps5Secundaria) }}</div>
+                  </div>
+                </div>
                 <div><span class="font-semibold">Código:</span><p>{{ selectedEmailDetails.codigo }}</p></div>
               </div>
             </div>
@@ -1042,7 +1058,7 @@ defineExpose({
       :email="editingEmail"
       :game-name="juegoSeleccionado.nombre"
       :game-version="juegoSeleccionado.version"
-      :game-costo="juegoSeleccionado.costo"
+      :game-precios="juegoSeleccionado.precios"
       :is-loading="isSavingEmail"
       :error="emailFormError"
       @confirm="handleSaveEmail"

@@ -129,11 +129,13 @@ const handleCheckout = (): void => {
   let mensaje = '¡Hola! Me gustaría realizar el siguiente pedido:%0A%0A'
   
   cartStore.items.forEach((item, index) => {
+    const precioUnitario = cartStore.getItemPrice(item)
     mensaje += `${index + 1}. ${item.nombre}%0A`
     mensaje += `   Plataforma: ${item.version}%0A`
+    mensaje += `   Tipo de cuenta: ${item.selectedAccountType}%0A`
     mensaje += `   Cantidad: ${item.quantity}%0A`
-    mensaje += `   Precio: $${item.costo.toFixed(2)} c/u%0A`
-    mensaje += `   Subtotal: $${(item.costo * item.quantity).toFixed(2)}%0A%0A`
+    mensaje += `   Precio: $${precioUnitario.toFixed(2)} c/u%0A`
+    mensaje += `   Subtotal: $${(precioUnitario * item.quantity).toFixed(2)}%0A%0A`
   })
   
   mensaje += `*TOTAL: $${cartStore.totalPrice.toFixed(2)}*%0A%0A`

@@ -162,7 +162,15 @@ export function useGames() {
         tipoPromocion = 'oferta' // Migración automática
       }
 
-      // Usar el costo del documento principal si existe, sino del primer correo
+      // Usar los precios del documento principal si existen, sino del primer correo, sino valores por defecto
+      const preciosJuego = juegoDocData.precios || juegoData?.precios || {
+        ps4Principal: juegoDocData.costo || juegoData?.costo || 0,
+        ps4Secundaria: juegoDocData.costo || juegoData?.costo || 0,
+        ps5Principal: juegoDocData.costo || juegoData?.costo || 0,
+        ps5Secundaria: juegoDocData.costo || juegoData?.costo || 0
+      }
+      
+      // Legacy: mantener costo para compatibilidad
       const costoJuego = juegoDocData.costo !== undefined ? juegoDocData.costo : (juegoData?.costo || 0)
       
       // Usar la version del documento principal si existe, sino usar la plataforma actual o del primer correo
@@ -171,7 +179,8 @@ export function useGames() {
       juegosMap.set(juegoId, {
         id: juegoId,
         nombre: juegoDocData.nombre || juegoData?.nombre || nombreFromId,
-        costo: costoJuego, // Precio del documento principal (último correo subido)
+        precios: preciosJuego, // Precios del documento principal (último correo subido)
+        costo: costoJuego, // Legacy: mantener para compatibilidad
         version: versionJuego, // Categoría del juego (PS4, PS5, PS4 & PS5, etc.)
         foto: juegoDocData.foto || '', // Foto del documento principal
         isOffert: juegoDocData.isOffert || false, // Legacy
@@ -222,10 +231,18 @@ export function useGames() {
 
       return querySnapshot.docs.map((doc) => {
         const data = doc.data()
+        // Manejar migración: si no hay precios, usar costo legacy
+        const precios = data.precios || {
+          ps4Principal: data.costo || 0,
+          ps4Secundaria: data.costo || 0,
+          ps5Principal: data.costo || 0,
+          ps5Secundaria: data.costo || 0
+        }
         return {
           correo: doc.id,
           nombre: data.nombre || '',
-          costo: data.costo || 0,
+          precios,
+          costo: data.costo || 0, // Legacy: mantener para compatibilidad
           version: data.version || plataforma,
           codigoMaster: data.codigoMaster || '',
           codigosGenerados: data.codigosGenerados || [],
@@ -258,10 +275,18 @@ export function useGames() {
       }
 
       const data = correoDoc.data()
+      // Manejar migración: si no hay precios, usar costo legacy
+      const precios = data.precios || {
+        ps4Principal: data.costo || 0,
+        ps4Secundaria: data.costo || 0,
+        ps5Principal: data.costo || 0,
+        ps5Secundaria: data.costo || 0
+      }
       return {
         correo: correoDoc.id,
         nombre: data.nombre || '',
-        costo: data.costo || 0,
+        precios,
+        costo: data.costo || 0, // Legacy: mantener para compatibilidad
         version: data.version || plataforma,
         codigoMaster: data.codigoMaster || '',
         codigosGenerados: data.codigosGenerados || [],
@@ -295,7 +320,7 @@ export function useGames() {
       // Construir el objeto de datos, filtrando campos undefined
       const correoData: Record<string, any> = {
         nombre: datosCorreo.nombre,
-        costo: datosCorreo.costo,
+        precios: datosCorreo.precios,
         version: datosCorreo.version,
         codigoMaster: datosCorreo.codigoMaster,
         codigosGenerados: datosCorreo.codigosGenerados,
@@ -304,6 +329,18 @@ export function useGames() {
         cuentas: datosCorreo.cuentas,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
+      }
+      
+      // Legacy: mantener costo para compatibilidad (usar el precio más bajo)
+      if (datosCorreo.precios) {
+        correoData.costo = Math.min(
+          datosCorreo.precios.ps4Principal,
+          datosCorreo.precios.ps4Secundaria,
+          datosCorreo.precios.ps5Principal,
+          datosCorreo.precios.ps5Secundaria
+        )
+      } else if (datosCorreo.costo !== undefined) {
+        correoData.costo = datosCorreo.costo
       }
 
       // Agregar campos opcionales solo si tienen valor
@@ -317,12 +354,26 @@ export function useGames() {
       // Crear el correo
       await setDoc(correoRef, correoData)
 
-      // Actualizar el precio del juego en el documento principal
-      // El último correo subido actualiza el precio del juego
-      await setDoc(juegoRef, {
-        costo: datosCorreo.costo,
+      // Actualizar los precios del juego en el documento principal
+      // El último correo subido actualiza los precios del juego
+      const updateData: Record<string, any> = {
         ultimaActualizacionPrecio: Timestamp.now()
-      }, { merge: true })
+      }
+      
+      if (datosCorreo.precios) {
+        updateData.precios = datosCorreo.precios
+        // Legacy: mantener costo (usar el precio más bajo)
+        updateData.costo = Math.min(
+          datosCorreo.precios.ps4Principal,
+          datosCorreo.precios.ps4Secundaria,
+          datosCorreo.precios.ps5Principal,
+          datosCorreo.precios.ps5Secundaria
+        )
+      } else if (datosCorreo.costo !== undefined) {
+        updateData.costo = datosCorreo.costo
+      }
+      
+      await setDoc(juegoRef, updateData, { merge: true })
     } catch (error) {
       console.error('Error creando correo:', error)
       throw error
@@ -362,8 +413,21 @@ export function useGames() {
 
       await updateDoc(correoRef, datosActualizados)
 
-      // Si se actualiza el costo, también actualizar el precio del juego
-      if (datos.costo !== undefined) {
+      // Si se actualizan los precios o el costo, también actualizar en el documento del juego
+      if (datos.precios) {
+        const updateData: Record<string, any> = {
+          precios: datos.precios,
+          ultimaActualizacionPrecio: Timestamp.now()
+        }
+        // Legacy: mantener costo (usar el precio más bajo)
+        updateData.costo = Math.min(
+          datos.precios.ps4Principal,
+          datos.precios.ps4Secundaria,
+          datos.precios.ps5Principal,
+          datos.precios.ps5Secundaria
+        )
+        await setDoc(juegoRef, updateData, { merge: true })
+      } else if (datos.costo !== undefined) {
         await setDoc(juegoRef, {
           costo: datos.costo,
           ultimaActualizacionPrecio: Timestamp.now()
@@ -421,7 +485,8 @@ export function useGames() {
     nombre: string,
     foto?: string,
     isOffert?: boolean,
-    version?: GamePlatform
+    version?: GamePlatform,
+    precios?: import('@/types/game').GamePrices
   ): Promise<string> => {
     try {
       // Limpiar cache al crear un juego
@@ -445,6 +510,16 @@ export function useGames() {
       
       if (foto && foto.trim()) juegoData.foto = foto.trim()
       if (isOffert !== undefined) juegoData.isOffert = isOffert
+      if (precios) {
+        juegoData.precios = precios
+        // Legacy: mantener costo (usar el precio más bajo)
+        juegoData.costo = Math.min(
+          precios.ps4Principal,
+          precios.ps4Secundaria,
+          precios.ps5Principal,
+          precios.ps5Secundaria
+        )
+      }
       
       await setDoc(juegoRef, juegoData)
       return juegoId
@@ -463,6 +538,7 @@ export function useGames() {
       version?: GamePlatform
       isOffert?: boolean
       tipoPromocion?: 'ninguna' | 'oferta' | 'promocion'
+      precios?: import('@/types/game').GamePrices
     }
   ): Promise<void> => {
     try {
@@ -478,8 +554,20 @@ export function useGames() {
         updateData.isOffert = datos.tipoPromocion === 'oferta'
       }
       if (datos.isOffert !== undefined) updateData.isOffert = datos.isOffert
+      if (datos.precios) {
+        updateData.precios = datos.precios
+        // Legacy: mantener costo (usar el precio más bajo)
+        updateData.costo = Math.min(
+          datos.precios.ps4Principal,
+          datos.precios.ps4Secundaria,
+          datos.precios.ps5Principal,
+          datos.precios.ps5Secundaria
+        )
+      }
       
       await setDoc(juegoRef, updateData, { merge: true })
+      // Limpiar cache al actualizar
+      clearCache(plataforma)
     } catch (error) {
       console.error('Error actualizando juego:', error)
       throw error
@@ -526,8 +614,15 @@ export function useGames() {
 
   const filtrarJuegosPorPrecio = (min?: number, max?: number): GameSummary[] => {
     return games.value.filter((juego) => {
-      if (min !== undefined && juego.costo < min) return false
-      if (max !== undefined && juego.costo > max) return false
+      // Usar el precio más bajo disponible para el filtro
+      const precioMinimo = Math.min(
+        juego.precios.ps4Principal,
+        juego.precios.ps4Secundaria,
+        juego.precios.ps5Principal,
+        juego.precios.ps5Secundaria
+      )
+      if (min !== undefined && precioMinimo < min) return false
+      if (max !== undefined && precioMinimo > max) return false
       return true
     })
   }
@@ -612,13 +707,25 @@ export function useGames() {
                   tipoPromocion,
                   totalCorreos: 0,
                   correos: [],
-                  stockAccounts: 0
+                  stockAccounts: 0,
+                  precios: {
+                    ps4Principal: 0,
+                    ps4Secundaria: 0,
+                    ps5Principal: 0,
+                    ps5Secundaria: 0
+                  }
                 }
 
                 // Crear el objeto GameEmailAccount
                 const emailAccount: GameEmailAccount = {
                   correo: correoDoc.id,
                   nombre: correoData.nombre || '',
+                  precios: {
+                    ps4Principal: 0,
+                    ps4Secundaria: 0,
+                    ps5Principal: 0,
+                    ps5Secundaria: 0
+                  },
                   costo: correoData.costo || 0,
                   version: correoData.version || plataforma,
                   codigoMaster: correoData.codigoMaster || '',
@@ -708,13 +815,25 @@ export function useGames() {
               tipoPromocion,
               totalCorreos: 0,
               correos: [],
-              stockAccounts: 0
+              stockAccounts: 0,
+              precios: {
+                ps4Principal: 0,
+                ps4Secundaria: 0,
+                ps5Principal: 0,
+                ps5Secundaria: 0
+              }
             }
 
             // Crear el objeto GameEmailAccount
             const emailAccount: GameEmailAccount = {
               correo: correoDoc.id,
               nombre: correoData.nombre || '',
+              precios: {
+                ps4Principal: 0,
+                ps4Secundaria: 0,
+                ps5Principal: 0,
+                ps5Secundaria: 0
+              },
               costo: correoData.costo || 0,
               version: correoData.version || plataforma,
               codigoMaster: correoData.codigoMaster || '',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useCartStore } from '@/stores/cart'
 import type { GameSummary } from '@/types/game'
 import { ShoppingCart, Star, Zap } from 'lucide-vue-next'
@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const cartStore = useCartStore()
+const selectedAccountType = ref<import('@/types/game').AccountType>('Principal PS4')
 
 const displayGames = computed(() => {
   // Mostrar máximo 4 banners principales para promociones
@@ -24,8 +25,23 @@ const displayGames = computed(() => {
 
 const hasGames = computed(() => props.games.length > 0)
 
+const getPrice = (game: GameSummary): number => {
+  switch (selectedAccountType.value) {
+    case 'Principal PS4':
+      return game.precios.ps4Principal
+    case 'Secundaria PS4':
+      return game.precios.ps4Secundaria
+    case 'Principal PS5':
+      return game.precios.ps5Principal
+    case 'Secundaria PS5':
+      return game.precios.ps5Secundaria
+    default:
+      return game.precios.ps4Principal
+  }
+}
+
 const addToCart = (game: GameSummary) => {
-  cartStore.addToCart(game, 1)
+  cartStore.addToCart(game, 1, selectedAccountType.value)
 }
 
 const formatPrice = (price: number) => {
@@ -109,23 +125,34 @@ const formatPrice = (price: number) => {
                 {{ game.nombre }}
               </h3>
               
-              <!-- Precio y botón -->
-              <div class="flex items-center justify-between gap-4">
-                <div class="flex items-center gap-2">
-                  <div class="bg-warning/20 backdrop-blur-md px-4 py-2 rounded-lg border border-warning/30">
-                    <p class="text-2xl font-black text-white">
-                      {{ formatPrice(game.costo) }}
-                    </p>
-                  </div>
-                </div>
-                
-                <button
-                  @click.stop="addToCart(game)"
-                  class="btn btn-warning btn-sm md:btn-md gap-2 shadow-lg hover:scale-110 transition-transform"
+              <!-- Selector de tipo de cuenta, precio y botón -->
+              <div class="flex flex-col gap-3">
+                <select 
+                  v-model="selectedAccountType" 
+                  class="select select-bordered select-sm bg-base-100/80 backdrop-blur-md w-full max-w-xs"
                 >
-                  <ShoppingCart :size="18" />
-                  <span class="hidden md:inline">Agregar</span>
-                </button>
+                  <option value="Principal PS4">PS4 Principal</option>
+                  <option value="Secundaria PS4">PS4 Secundaria</option>
+                  <option value="Principal PS5">PS5 Principal</option>
+                  <option value="Secundaria PS5">PS5 Secundaria</option>
+                </select>
+                <div class="flex items-center justify-between gap-4">
+                  <div class="flex items-center gap-2">
+                    <div class="bg-warning/20 backdrop-blur-md px-4 py-2 rounded-lg border border-warning/30">
+                      <p class="text-2xl font-black text-white">
+                        {{ formatPrice(getPrice(game)) }}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    @click.stop="addToCart(game)"
+                    class="btn btn-warning btn-sm md:btn-md gap-2 shadow-lg hover:scale-110 transition-transform"
+                  >
+                    <ShoppingCart :size="18" />
+                    <span class="hidden md:inline">Agregar</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -159,7 +186,7 @@ const formatPrice = (price: number) => {
                 <div class="absolute inset-0 flex flex-col justify-end p-3">
                   <p class="text-xs md:text-sm font-bold text-white line-clamp-2 mb-2">{{ game.nombre }}</p>
                   <div class="flex items-center justify-between">
-                    <p class="text-lg md:text-xl font-black text-warning">{{ formatPrice(game.costo) }}</p>
+                    <p class="text-lg md:text-xl font-black text-warning">{{ formatPrice(getPrice(game)) }}</p>
                     <div class="btn btn-xs btn-warning btn-circle">
                       <ShoppingCart :size="14" />
                     </div>
