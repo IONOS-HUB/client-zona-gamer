@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
 import { useGames } from '@/composables/useGames'
-import type { ComboSummary, ComboPlatform, PromocionType } from '@/types/combo'
+import type { ComboSummary, ComboPlatform } from '@/types/combo'
+import type { PromocionType } from '@/types/game'
 import type { GamePrices, GameSummary } from '@/types/game'
 
 export interface ComboFormData {
@@ -526,17 +527,29 @@ onMounted(async () => {
                 </svg>
               </button>
             </div>
+            <label class="label">
+              <span class="label-text-alt text-info flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {{ isDriveUrlTransformed ? 'Las URLs de Google Drive se transforman automáticamente a formato thumbnail' : 'Pega la URL de la imagen. Si es de Google Drive, se convertirá automáticamente.' }}
+              </span>
+            </label>
           </div>
 
-          <!-- Vista previa de imagen -->
+          <!-- Vista previa de imagen mejorada -->
           <div v-if="formData.foto" class="card bg-base-200 border border-base-300 shadow-lg">
             <div class="card-body p-6">
               <h4 class="font-semibold mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
                 Vista previa
               </h4>
               <div class="flex justify-center">
                 <div class="rounded-lg overflow-hidden shadow-xl border-2 border-primary/20" style="width: 446px; height: 537px; max-width: 100%; aspect-ratio: 446 / 537;">
-                  <img :src="formData.foto" alt="Preview" class="w-full h-full object-cover" @error="handleImageError" />
+                  <img :src="formData.foto" alt="Preview" class="w-full h-full object-cover" style="width: 100%; height: 100%; object-fit: cover;" @error="handleImageError" />
                 </div>
               </div>
             </div>
