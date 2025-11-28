@@ -110,6 +110,46 @@ service cloud.firestore {
     }
     
     // ========================================
+    // COLECCIÓN: combos (estructura jerárquica)
+    // ========================================
+    // Estructura: combos/{plataforma}/combos/{comboId}
+    match /combos/{plataforma}/combos/{comboId} {
+      
+      // 🔓 LEER: PÚBLICO (para que la página principal funcione)
+      // Cualquiera puede ver los combos (necesario para HomeView)
+      allow read: if true;
+      
+      // 🔒 CREAR: solo admins pueden crear combos
+      allow create: if isAdmin();
+      
+      // 🔒 ACTUALIZAR: solo admins pueden actualizar combos
+      allow update: if isAdmin();
+      
+      // 🔒 ELIMINAR: solo admins pueden eliminar combos
+      allow delete: if isAdmin();
+      
+      // ========================================
+      // SUB-COLECCIÓN: correos
+      // ========================================
+      // Estructura: combos/{plataforma}/combos/{comboId}/correos/{correoId}
+      match /correos/{correoId} {
+        // 🔒 LEER: solo empleados y admins pueden ver correos
+        // (contienen información sensible: emails y contraseñas)
+        allow read: if isEmployeeOrAdmin();
+        
+        // 🔒 CREAR: solo admins pueden crear correos
+        allow create: if isAdmin();
+        
+        // 🔒 ACTUALIZAR: empleados y admins pueden actualizar
+        // (necesario para eliminar códigos al generar mensajes WhatsApp)
+        allow update: if isEmployeeOrAdmin();
+        
+        // 🔒 ELIMINAR: solo admins pueden eliminar correos
+        allow delete: if isAdmin();
+      }
+    }
+    
+    // ========================================
     // COLECCIÓN: reportes
     // ========================================
     match /reportes/{reporteId} {
