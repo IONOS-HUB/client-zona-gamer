@@ -27,9 +27,11 @@ watch(combos, (newCombos) => {
     id: c.id, 
     nombre: c.nombre, 
     correos: c.totalCorreos, 
-    stock: c.stockAccounts 
+    stock: c.stockAccounts,
+    activo: c.activo
   })))
 }, { immediate: true })
+
 
 // Obtener el precio del combo
 const getPrecioCombo = (combo: ComboSummary): number => {
@@ -137,13 +139,6 @@ const agregarComboAlCarrito = (combo: ComboSummary): void => {
               -{{ calcularDescuento(combo) }}%
             </div>
             
-            <!-- Badge de stock -->
-            <div 
-              v-if="combo.stockAccounts && combo.stockAccounts > 0"
-              class="absolute top-4 right-4 bg-success text-white font-bold px-3 py-1 rounded-lg shadow-lg text-sm"
-            >
-              {{ combo.stockAccounts }} disponible{{ combo.stockAccounts > 1 ? 's' : '' }}
-            </div>
             
             <!-- Overlay con gradiente -->
             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
@@ -217,22 +212,18 @@ const agregarComboAlCarrito = (combo: ComboSummary): void => {
             <!-- Botón agregar -->
             <button
               @click="agregarComboAlCarrito(combo)"
-              class="btn btn-error w-full text-white font-bold gap-2 shadow-glow hover:shadow-glow transition-all"
-              :disabled="!combo.stockAccounts || combo.stockAccounts === 0"
+              class="btn w-full font-bold gap-2 shadow-glow hover:shadow-glow transition-all"
               :class="{
                 'btn-success': cartStore.isInCart(combo.id),
-                'btn-error': !cartStore.isInCart(combo.id) && combo.stockAccounts && combo.stockAccounts > 0
+                'btn-error': !cartStore.isInCart(combo.id)
               }"
             >
               <Package :size="20" />
               <span v-if="cartStore.isInCart(combo.id)">
                 ✓ En el Carrito ({{ cartStore.getItemQuantity(combo.id) }})
               </span>
-              <span v-else-if="combo.stockAccounts && combo.stockAccounts > 0">
-                Agregar Combo al Carrito
-              </span>
               <span v-else>
-                Sin Stock
+                Agregar Combo al Carrito
               </span>
             </button>
           </div>
