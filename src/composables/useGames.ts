@@ -183,6 +183,7 @@ export function useGames() {
         costo: costoJuego, // Legacy: mantener para compatibilidad
         version: versionJuego, // Categoría del juego (PS4, PS5, PS4 & PS5, etc.)
         foto: juegoDocData.foto || '', // Foto del documento principal
+        activo: juegoDocData.activo !== false, // Por defecto true si no está definido
         isOffert: juegoDocData.isOffert || false, // Legacy
         tipoPromocion, // Nuevo campo de tipo de promoción
         totalCorreos: correos.length,
@@ -566,7 +567,8 @@ export function useGames() {
       const juegoData: Record<string, any> = {
         createdAt: new Date(),
         nombre: nombre,
-        version: version || plataforma // Si no se especifica, usar la plataforma
+        version: version || plataforma, // Si no se especifica, usar la plataforma
+        activo: true // Por defecto activo al crear
       }
       
       if (foto && foto.trim()) juegoData.foto = foto.trim()
@@ -597,6 +599,7 @@ export function useGames() {
       nombre?: string
       foto?: string
       version?: GamePlatform
+      activo?: boolean
       isOffert?: boolean
       tipoPromocion?: 'ninguna' | 'oferta' | 'promocion'
       precios?: import('@/types/game').GamePrices
@@ -609,6 +612,7 @@ export function useGames() {
       if (datos.nombre !== undefined) updateData.nombre = datos.nombre
       if (datos.foto !== undefined) updateData.foto = datos.foto
       if (datos.version !== undefined) updateData.version = datos.version
+      if (datos.activo !== undefined) updateData.activo = datos.activo
       if (datos.tipoPromocion !== undefined) {
         updateData.tipoPromocion = datos.tipoPromocion
         // Actualizar también isOffert para compatibilidad

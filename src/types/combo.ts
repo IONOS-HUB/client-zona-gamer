@@ -40,6 +40,7 @@ export interface ComboSummary {
   precios: GamePrices // Mantener para compatibilidad con GameSummary
   version: ComboPlatform
   foto?: string // URL de la imagen del combo
+  activo?: boolean // Si el combo está visible/activo en la tienda (por defecto true)
   isOffert?: boolean // Si el combo está en oferta (legacy - mantener por compatibilidad)
   tipoPromocion?: PromocionType // Tipo de promoción: ninguna, oferta o promocion
   totalCorreos: number
@@ -62,6 +63,7 @@ export interface ComboDocument {
   nombre?: string
   foto?: string
   version?: ComboPlatform // Categoría del combo: PS4, PS5, PS4 & PS5, etc.
+  activo?: boolean // Si el combo está visible/activo en la tienda
   isOffert?: boolean // Legacy - mantener por compatibilidad
   tipoPromocion?: PromocionType
   precio?: number // Precio único global

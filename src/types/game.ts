@@ -46,6 +46,7 @@ export interface GameSummary {
   precios: GamePrices // Objeto con los 4 precios
   version: GamePlatform
   foto?: string // URL de la imagen del juego
+  activo?: boolean // Si el juego está visible/activo en la tienda (por defecto true)
   isOffert?: boolean // Si el juego está en oferta (legacy - mantener por compatibilidad)
   tipoPromocion?: PromocionType // Tipo de promoción: ninguna, oferta o promocion
   totalCorreos: number
@@ -65,6 +66,7 @@ export interface GameDocument {
   nombre?: string
   foto?: string
   version?: GamePlatform // Categoría del juego: PS4, PS5, PS4 & PS5, etc.
+  activo?: boolean // Si el juego está visible/activo en la tienda
   isOffert?: boolean // Legacy - mantener por compatibilidad
   tipoPromocion?: PromocionType
   precios?: GamePrices // Objeto con los 4 precios (actualizado por el último correo)

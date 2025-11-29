@@ -8,9 +8,13 @@ const { games } = useGames()
 
 // Filtrar juegos indie o destacados para el top
 const topIndieGames = computed(() => {
-  // Por ahora, tomamos los primeros 4 juegos destacados o con descuento
+  // Por ahora, tomamos los primeros 4 juegos destacados o con descuento que estén activos
   return games.value
-    .filter(game => game.destacado || (game.descuento && game.descuento > 0))
+    .filter(game => {
+      const estaActivo = game.activo !== false
+      const esDestacado = game.destacado || (game.descuento && game.descuento > 0)
+      return estaActivo && esDestacado
+    })
     .slice(0, 4)
 })
 </script>

@@ -192,6 +192,7 @@ export function useCombos() {
           costo: costoCombo, // Legacy: mantener para compatibilidad
           version: versionCombo,
           foto: comboDocData.foto || '',
+          activo: comboDocData.activo !== false, // Por defecto true si no está definido
           isOffert: comboDocData.isOffert || false,
           tipoPromocion,
           totalCorreos: correos.length,
@@ -594,7 +595,8 @@ export function useCombos() {
         nombre: nombre,
         version: version || plataforma,
         precio: precio || 0,
-        juegos: juegos || []
+        juegos: juegos || [],
+        activo: true // Por defecto activo al crear
       }
       
       if (foto && foto.trim()) comboData.foto = foto.trim()
@@ -619,6 +621,7 @@ export function useCombos() {
       nombre?: string
       foto?: string
       version?: ComboPlatform
+      activo?: boolean
       isOffert?: boolean
       tipoPromocion?: 'ninguna' | 'oferta' | 'promocion'
       precio?: number
@@ -633,6 +636,7 @@ export function useCombos() {
       if (datos.nombre !== undefined) updateData.nombre = datos.nombre
       if (datos.foto !== undefined) updateData.foto = datos.foto
       if (datos.version !== undefined) updateData.version = datos.version
+      if (datos.activo !== undefined) updateData.activo = datos.activo
       if (datos.tipoPromocion !== undefined) {
         updateData.tipoPromocion = datos.tipoPromocion
         // Actualizar también isOffert para compatibilidad

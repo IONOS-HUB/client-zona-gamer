@@ -3,18 +3,21 @@ import { computed, watch } from 'vue'
 import { useCombos } from '@/composables/useCombos'
 import { useCartStore } from '@/stores/cart'
 import type { ComboSummary } from '@/types/combo'
-import type { AccountType } from '@/types/game'
+import type { GameSummary, AccountType } from '@/types/game'
 import { Package, Sparkles } from 'lucide-vue-next'
 
 const { combos, isLoadingCombos } = useCombos()
 const cartStore = useCartStore()
 
-// Mostrar todos los combos (no solo los que tienen stock)
-// Si quieres filtrar solo los que tienen stock, cambia esto a:
-// return combos.value.filter(combo => (combo.stockAccounts ?? 0) > 0)
+// Mostrar solo los combos activos y que tengan correos
 const combosDisponibles = computed(() => {
-  // Mostrar todos los combos que tienen al menos un correo
-  return combos.value.filter(combo => (combo.totalCorreos ?? 0) > 0)
+  return combos.value.filter(combo => {
+    // Filtrar por activo (por defecto true si no está definido)
+    const estaActivo = combo.activo !== false
+    // Filtrar por correos disponibles
+    const tieneCorreos = (combo.totalCorreos ?? 0) > 0
+    return estaActivo && tieneCorreos
+  })
 })
 
 // Debug: log para ver qué combos se están cargando
@@ -51,24 +54,36 @@ const formatearPrecio = (precio: number): string => {
 }
 
 // Agregar combo al carrito (tratándolo como un juego)
-const agregarComboAlCarrito = (combo: ComboSummary, accountType: AccountType = 'Principal PS4'): void => {
+const agregarComboAlCarrito = (combo: ComboSummary): void => {
+  const precioCombo = getPrecioCombo(combo)
+  
   // Convertir el combo a formato GameSummary para el carrito
-  const comboAsGame = {
-    ...combo,
-    // Asegurar que tenga todos los campos necesarios
+  // Para combos, todos los precios son iguales (precio único)
+  const comboAsGame: GameSummary = {
     id: combo.id,
     nombre: combo.nombre,
     foto: combo.foto,
     version: combo.version,
-    precios: combo.precios,
-    tipoPromocion: combo.tipoPromocion,
-    isOffert: combo.isOffert,
+    // Para combos, todos los precios son iguales al precio único
+    precios: {
+      ps4Principal: precioCombo,
+      ps4Secundaria: precioCombo,
+      ps5Principal: precioCombo,
+      ps5Secundaria: precioCombo
+    },
+    tipoPromocion: combo.tipoPromocion || 'ninguna',
+    isOffert: combo.isOffert || false,
     descuento: calcularDescuento(combo),
-    stockAccounts: combo.stockAccounts,
-    totalCorreos: combo.totalCorreos
+    stockAccounts: combo.stockAccounts || 0,
+    totalCorreos: combo.totalCorreos,
+    correos: combo.correos || [],
+    // Campos adicionales para compatibilidad
+    costo: precioCombo,
+    activo: combo.activo !== false
   }
   
-  cartStore.addToCart(comboAsGame, 1, accountType)
+  // Para combos, usamos Principal PS4 como tipo por defecto, pero el precio es el mismo para todos
+  cartStore.addToCart(comboAsGame, 1, 'Principal PS4')
 }
 </script>
 
@@ -202,11 +217,23 @@ const agregarComboAlCarrito = (combo: ComboSummary, accountType: AccountType = '
             <!-- Botón agregar -->
             <button
               @click="agregarComboAlCarrito(combo)"
-              class="btn btn-error w-full text-white font-bold gap-2 shadow-glow hover:shadow-glow"
+              class="btn btn-error w-full text-white font-bold gap-2 shadow-glow hover:shadow-glow transition-all"
               :disabled="!combo.stockAccounts || combo.stockAccounts === 0"
+              :class="{
+                'btn-success': cartStore.isInCart(combo.id),
+                'btn-error': !cartStore.isInCart(combo.id) && combo.stockAccounts && combo.stockAccounts > 0
+              }"
             >
               <Package :size="20" />
-              {{ combo.stockAccounts && combo.stockAccounts > 0 ? 'Agregar Combo al Carrito' : 'Sin Stock' }}
+              <span v-if="cartStore.isInCart(combo.id)">
+                ✓ En el Carrito ({{ cartStore.getItemQuantity(combo.id) }})
+              </span>
+              <span v-else-if="combo.stockAccounts && combo.stockAccounts > 0">
+                Agregar Combo al Carrito
+              </span>
+              <span v-else>
+                Sin Stock
+              </span>
             </button>
           </div>
         </div>

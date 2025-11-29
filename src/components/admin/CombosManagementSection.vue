@@ -498,6 +498,26 @@ const cancelarEliminacion = (): void => {
   deleteError.value = ''
 }
 
+// Toggle activo/inactivo
+const toggleActivoCombo = async (combo: ComboSummary): Promise<void> => {
+  try {
+    const nuevoEstado = !(combo.activo !== false) // Si no está definido o es true, cambiar a false
+    await actualizarCombo('PS4 & PS5', combo.id, {
+      activo: nuevoEstado
+    })
+    
+    // Actualizar localmente
+    combo.activo = nuevoEstado
+    
+    successMessage.value = `Combo ${nuevoEstado ? 'activado' : 'desactivado'} exitosamente`
+    setTimeout(() => { successMessage.value = '' }, 3000)
+  } catch (error) {
+    console.error('Error cambiando estado del combo:', error)
+    errorMessage.value = 'Error al cambiar el estado del combo'
+    setTimeout(() => { errorMessage.value = '' }, 3000)
+  }
+}
+
 // Funciones para modal de combo
 const abrirModalCrearCombo = (): void => {
   editingCombo.value = null
@@ -948,6 +968,7 @@ defineExpose({
             <thead>
               <tr>
                 <th>#</th>
+                <th>Estado</th>
                 <th>Foto</th>
                 <th>Nombre</th>
                 <th>Precio</th>
@@ -959,6 +980,21 @@ defineExpose({
             <tbody>
               <tr v-for="(combo, index) in combosFiltrados" :key="combo.id">
                 <td>{{ index + 1 }}</td>
+                <td>
+                  <div class="form-control">
+                    <label class="label cursor-pointer flex-col gap-1">
+                      <input 
+                        type="checkbox" 
+                        :checked="combo.activo !== false"
+                        @change="toggleActivoCombo(combo)"
+                        class="toggle toggle-success" 
+                      />
+                      <span class="label-text text-xs">
+                        {{ combo.activo !== false ? 'Activo' : 'Inactivo' }}
+                      </span>
+                    </label>
+                  </div>
+                </td>
                 <td>
                   <div class="avatar">
                     <div class="rounded overflow-hidden" style="width: 89px; height: 107px; aspect-ratio: 446 / 537;">

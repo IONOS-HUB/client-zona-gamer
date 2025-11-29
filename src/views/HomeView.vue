@@ -76,13 +76,16 @@ const juegosFiltrados = computed(() => {
 
 // Juegos filtrados por plataforma seleccionada
 const juegosFiltradosPorPlataforma = computed(() => {
-  // Si es "PS4 & PS5", mostrar todos
+  // Primero filtrar solo juegos activos
+  const juegosActivos = games.value.filter(juego => juego.activo !== false)
+  
+  // Si es "PS4 & PS5", mostrar todos los activos
   if (filtroPlataforma.value === 'PS4 & PS5') {
-    return games.value
+    return juegosActivos
   }
   
   // Filtrar por la plataforma específica
-  return games.value.filter(juego => 
+  return juegosActivos.filter(juego => 
     juego.version === filtroPlataforma.value || juego.version === 'PS4 & PS5'
   )
 })
