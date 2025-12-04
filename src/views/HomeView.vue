@@ -443,7 +443,9 @@ onBeforeUnmount(() => {
     <ContactLocationSection />
 
     <!-- Footer -->
-    <AppFooter />
+    <div class="relative z-50">
+      <AppFooter />
+    </div>
 
     <!-- Modal del Carrito -->
     <CartModal 

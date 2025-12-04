@@ -319,48 +319,40 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
 
     <!-- Contenido Principal -->
     <div class="container mx-auto px-4 md:px-6 pt-28 pb-8">
-      <!-- Header -->
-      <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
-        <div>
-          <h1 class="text-4xl md:text-5xl font-black text-white mb-2">
-            {{ getTituloSeccion }}
-          </h1>
-          <p class="text-base-content/70 text-lg">
-            {{ itemsOrdenados.length }} {{ itemsOrdenados.length === 1 ? 'resultado' : 'resultados' }} encontrados
-          </p>
-        </div>
-        
-        <!-- Botón toggle filtros (móvil) -->
-        <button 
-          @click="showFilters = !showFilters"
-          class="lg:hidden btn btn-outline gap-2"
-        >
-          <Filter :size="20" />
-          <span>{{ showFilters ? 'Ocultar' : 'Mostrar' }} Filtros</span>
-        </button>
-      </div>
-
-      <div class="flex flex-col lg:flex-row gap-6 lg:items-start">
+      <div class="flex flex-col lg:grid lg:grid-cols-[320px_1fr] gap-6">
         <!-- Sidebar de filtros -->
         <aside 
           :class="[
-            'lg:w-80 bg-base-200 rounded-2xl p-6 space-y-6 border border-white/10 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto custom-scrollbar',
+            'bg-base-200 rounded-2xl border border-white/10 lg:w-80',
+            'lg:sticky lg:top-28 lg:self-start lg:h-fit lg:max-h-[calc(100vh-8rem)] lg:z-40',
             showFilters ? 'block' : 'hidden lg:block'
           ]"
         >
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-2xl font-bold flex items-center gap-2">
-              <SlidersHorizontal :size="24" />
-              Filtros
-            </h2>
-            <button 
-              @click="limpiarFiltros"
-              class="btn btn-ghost btn-sm gap-2 text-error"
-            >
-              <X :size="16" />
-              Limpiar
-            </button>
+          <!-- Título de la sección (fijo en el sidebar) -->
+          <div class="p-6 pb-4 border-b border-white/10">
+            <h1 class="text-3xl font-black text-white mb-2">
+              {{ getTituloSeccion }}
+            </h1>
+            <p class="text-base-content/70 text-sm">
+              {{ itemsOrdenados.length }} {{ itemsOrdenados.length === 1 ? 'resultado' : 'resultados' }}
+            </p>
           </div>
+
+          <!-- Área con scroll de filtros -->
+          <div class="p-6 space-y-6 lg:max-h-[calc(100vh-20rem)] lg:overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-bold flex items-center gap-2">
+                <SlidersHorizontal :size="20" />
+                Filtros
+              </h2>
+              <button 
+                @click="limpiarFiltros"
+                class="btn btn-ghost btn-sm gap-2 text-error"
+              >
+                <X :size="16" />
+                Limpiar
+              </button>
+            </div>
 
           <!-- Tipo de contenido -->
           <div class="form-control">
@@ -438,28 +430,50 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
             </div>
           </div>
 
-          <!-- Resumen de filtros activos -->
-          <div class="bg-base-300 rounded-lg p-4 space-y-2">
-            <h3 class="font-bold text-sm text-base-content/70">Filtros Activos:</h3>
-            <div class="flex flex-wrap gap-2">
-              <div v-if="selectedTipo !== 'todos'" class="badge badge-error gap-1">
-                {{ selectedTipo }}
-              </div>
-              <div v-if="selectedPlataforma !== 'PS4 & PS5'" class="badge badge-primary gap-1">
-                {{ selectedPlataforma }}
-              </div>
-              <div v-if="selectedOrden !== 'relevancia'" class="badge badge-success gap-1">
-                {{ selectedOrden }}
-              </div>
-              <div v-if="precioMin > 0 || precioMax < 100" class="badge badge-warning gap-1">
-                ${{ precioMin }} - ${{ precioMax }}
+            <!-- Resumen de filtros activos -->
+            <div class="bg-base-300 rounded-lg p-4 space-y-2">
+              <h3 class="font-bold text-sm text-base-content/70">Filtros Activos:</h3>
+              <div class="flex flex-wrap gap-2">
+                <div v-if="selectedTipo !== 'todos'" class="badge badge-error gap-1">
+                  {{ selectedTipo }}
+                </div>
+                <div v-if="selectedPlataforma !== 'PS4 & PS5'" class="badge badge-primary gap-1">
+                  {{ selectedPlataforma }}
+                </div>
+                <div v-if="selectedOrden !== 'relevancia'" class="badge badge-success gap-1">
+                  {{ selectedOrden }}
+                </div>
+                <div v-if="precioMin > 0 || precioMax < 100" class="badge badge-warning gap-1">
+                  ${{ precioMin }} - ${{ precioMax }}
+                </div>
               </div>
             </div>
           </div>
         </aside>
 
         <!-- Grid de resultados -->
-        <div class="flex-1">
+        <div class="w-full">
+          <!-- Header (solo móvil) -->
+          <div class="lg:hidden flex flex-col gap-4 mb-8">
+            <div>
+              <h1 class="text-4xl md:text-5xl font-black text-white mb-2">
+                {{ getTituloSeccion }}
+              </h1>
+              <p class="text-base-content/70 text-lg">
+                {{ itemsOrdenados.length }} {{ itemsOrdenados.length === 1 ? 'resultado' : 'resultados' }} encontrados
+              </p>
+            </div>
+            
+            <!-- Botón toggle filtros (móvil) -->
+            <button 
+              @click="showFilters = !showFilters"
+              class="btn btn-outline gap-2 w-full"
+            >
+              <Filter :size="20" />
+              <span>{{ showFilters ? 'Ocultar' : 'Mostrar' }} Filtros</span>
+            </button>
+          </div>
+
           <!-- Loading -->
           <div v-if="isLoadingGames || isLoadingCombos" class="flex justify-center items-center py-20">
             <span class="loading loading-spinner loading-lg text-error"></span>
@@ -501,7 +515,9 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
     </div>
 
     <!-- Footer -->
-    <AppFooter />
+    <div class="relative z-50">
+      <AppFooter />
+    </div>
   </div>
 </template>
 
