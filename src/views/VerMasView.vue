@@ -139,8 +139,9 @@ const itemsFiltrados = computed(() => {
         item.precios.ps5Principal,
         item.precios.ps5Secundaria
       )
-    } else if (item.tipo === 'combo' && ('precio' in item || 'costo' in item)) {
-      precio = (item.precio || item.costo) ?? 0
+    } else if (item.tipo === 'combo') {
+      const combo = item as ComboSummary
+      precio = (combo.precio || combo.costo) ?? 0
     }
     
     // Aplicar descuento si existe
@@ -204,8 +205,9 @@ const getPrecioItem = (item: ContentItem): number => {
       item.precios.ps5Principal,
       item.precios.ps5Secundaria
     )
-  } else if (item.tipo === 'combo' && ('precio' in item || 'costo' in item)) {
-    precio = (item.precio || item.costo) ?? 0
+  } else if (item.tipo === 'combo') {
+    const combo = item as ComboSummary
+    precio = (combo.precio || combo.costo) ?? 0
   }
   
   // Aplicar descuento si existe

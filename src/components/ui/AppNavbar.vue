@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useRoles } from '@/composables/useRoles'
 import { useCartStore } from '@/stores/cart'
@@ -9,9 +9,14 @@ import type { GamePlatform } from '@/types/game'
 import logo from '/Images/logo/logo.png'
 
 const router = useRouter()
+const route = useRoute()
 const { currentUser, signOut } = useAuth()
 const { currentUserData, isAdmin, hasEmployeeAccess, loadUserData } = useRoles()
 const cartStore = useCartStore()
+
+// Computed para determinar la ruta activa
+const isHomeActive = computed(() => route.path === '/')
+const isCatalogActive = computed(() => route.path === '/ver-mas')
 
 const searchQuery = ref('')
 const selectedPlatform = ref<GamePlatform>('PS4 & PS5')
@@ -351,7 +356,12 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <!-- Botón Inicio -->
               <a
                 href="/"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 hover:scale-105 text-sm text-white hover:bg-white/10"
+                :class="[
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 hover:scale-105 text-sm text-white',
+                  isHomeActive 
+                    ? 'bg-linear-to-r from-error to-orange-600 shadow-lg' 
+                    : 'hover:bg-white/10'
+                ]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -362,7 +372,12 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <!-- Botón Catálogo -->
               <button
                 @click="irAlCatalogo"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 hover:scale-105 text-sm bg-gradient-to-r from-error to-orange-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl"
+                :class="[
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all duration-300 hover:scale-105 text-sm text-white',
+                  isCatalogActive
+                     ? 'bg-linear-to-r from-error to-orange-600 shadow-lg' 
+                    : 'hover:bg-white/10'
+                ]"
               >
                 <BookOpen :size="20" class="shrink-0" />
                 <span>Catálogo</span>
@@ -425,7 +440,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <ul
                 ref="userDropdownRef"
                 tabindex="0"
-                class="mt-3 z-[9999] p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-56 sm:w-60 border border-white/10 animate-scaleIn fixed lg:absolute"
+                class="mt-3 z-9999 p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-56 sm:w-60 border border-white/10 animate-scaleIn fixed lg:absolute"
               >
                 <!-- Información del usuario -->
                 <li class="menu-title">
@@ -485,7 +500,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
               <div
                 ref="cartDropdownRef"
                 tabindex="0"
-                class="mt-3 z-[9999] card card-compact dropdown-content w-[calc(100vw-2rem)] sm:w-80 shadow-xl border border-white/10 animate-fadeInUp bg-base-100 fixed lg:absolute"
+                class="mt-3 z-9999 card card-compact dropdown-content w-[calc(100vw-2rem)] sm:w-80 shadow-xl border border-white/10 animate-fadeInUp bg-base-100 fixed lg:absolute"
               >
                 <div class="card-body">
                   <div class="flex items-center justify-between mb-2">
@@ -549,7 +564,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
                           >
                             <Minus :size="12" />
                           </button>
-                          <span class="text-sm font-bold min-w-[2rem] text-center">{{ item.quantity }}</span>
+                          <span class="text-sm font-bold min-w-8 text-center">{{ item.quantity }}</span>
                           <button 
                             @click.stop="incrementCartQuantity(item.id, item.quantity)"
                             class="btn btn-xs btn-circle h-6 w-6 min-h-0 p-0 hover:bg-success hover:text-white transition-all"
@@ -624,7 +639,12 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
             <!-- Botón Inicio -->
             <a
               href="/"
-              class="flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-300 text-white hover:bg-white/10 w-full"
+              :class="[
+                'flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-300 text-white w-full',
+                isHomeActive
+                  ? 'bg-linear-to-r from-error to-orange-600 shadow-lg'
+                  : 'hover:bg-white/10'
+              ]"
               @click="closeMobileMenu"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -636,7 +656,12 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
             <!-- Botón Catálogo -->
             <button
               @click="irAlCatalogo"
-              class="flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-error to-orange-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg w-full"
+              :class="[
+                'flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-300 text-white shadow-lg w-full',
+                isCatalogActive
+                  ? 'bg-linear-to-r from-error to-orange-600 shadow-lg'
+                  : 'bg-linear-gradient(to right, #ef4444, #f97316)'
+              ]"
             >
               <BookOpen :size="24" class="shrink-0" />
               <span>Explorar Catálogo</span>
@@ -831,6 +856,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
 /* Line clamp utility */
 .line-clamp-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
