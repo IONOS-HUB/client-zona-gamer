@@ -429,14 +429,6 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- SECCIÓN FINAL: TODAS LAS OFERTAS Y PROMOCIONES (Parte Inferior) -->
-          <OffersSection 
-            v-if="todasLasOfertas.length > 0"
-            :games="todasLasOfertas"
-            title="Todas las Ofertas y Promociones"
-            subtitle="¡Toda nuestra selección de juegos en oferta en un solo lugar!"
-            variant="secondary"
-          />
         </template>
       </template>
     </div>

@@ -114,7 +114,7 @@ const reviews: Review[] = [
           </p>
 
           <!-- Botón de reseñas -->
-          <button class="btn bg-orange-500 hover:bg-orange-600 border-none text-white font-semibold px-6 py-3 rounded-lg">
+          <button class="btn btn-error btn-outline">
             1,561,197 reseñas de usuarios
           </button>
         </div>

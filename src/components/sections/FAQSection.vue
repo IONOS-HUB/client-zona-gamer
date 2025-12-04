@@ -106,7 +106,7 @@ const toggleItem = (id: string): void => {
       <!-- Contacto adicional -->
       <div class="text-center mt-12">
         <p class="text-base-content/70 mb-4">¿No encuentras la respuesta que buscas?</p>
-        <button class="btn btn-error gap-2 shadow-glow">
+        <button class="btn btn-error btn-outline gap-2">
           <MessageCircle :size="20" />
           Contactar Soporte
         </button>

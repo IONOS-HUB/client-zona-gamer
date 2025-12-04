@@ -287,11 +287,7 @@ const handleVerMas = () => {
                   <!-- Botón agregar -->
                   <button
                     @click="agregarComboAlCarrito(combo)"
-                    class="btn w-full font-bold gap-2 shadow-glow hover:shadow-glow transition-all mt-auto"
-                    :class="{
-                      'btn-success': cartStore.isInCart(combo.id),
-                      'btn-error': !cartStore.isInCart(combo.id)
-                    }"
+                    class="btn btn-error btn-outline w-full gap-2 mt-auto"
                   >
                     <Package :size="20" />
                     <span v-if="cartStore.isInCart(combo.id)">
@@ -324,13 +320,10 @@ const handleVerMas = () => {
         <div v-if="hasMoreCombos" class="mt-10 flex justify-center">
           <button 
             @click="handleVerMas"
-            class="group relative inline-flex items-center justify-center gap-3 px-8 py-4 text-lg font-bold text-white transition-all duration-300 bg-gradient-to-r from-purple-600 via-pink-500 to-rose-500 rounded-2xl hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/50 overflow-hidden"
+            class="btn btn-error btn-outline gap-2"
           >
-            <!-- Efecto de brillo animado -->
-            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-            
-            <span class="relative z-10">Ver Todos los Combos</span>
-            <ArrowRight :size="24" class="relative z-10 group-hover:translate-x-2 transition-transform duration-300" />
+            <span>Ver Todos los Combos</span>
+            <ArrowRight :size="24" />
           </button>
         </div>
       </div>

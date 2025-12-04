@@ -159,10 +159,22 @@ onUnmounted(() => {
 })
 
 const handleSearch = (): void => {
-  emit('search', searchQuery.value)
+  if (searchQuery.value.trim()) {
+    // Redirigir al catálogo con la búsqueda
+    router.push({
+      name: 'VerMas',
+      query: {
+        q: searchQuery.value.trim()
+      }
+    })
+    // Cerrar el buscador en desktop
+    isSearchExpanded.value = false
+    // Cerrar menú móvil
+    isMobileMenuOpen.value = false
+  }
 }
 
-// Búsqueda en tiempo real mientras escribe
+// Búsqueda en tiempo real mientras escribe (solo emitir para filtrado local)
 const handleSearchInput = (): void => {
   emit('search', searchQuery.value)
 }

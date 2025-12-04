@@ -38,6 +38,7 @@ onMounted(async () => {
   const categoria = route.query.categoria as string
   const plataforma = route.query.plataforma as string
   const orden = route.query.orden as string
+  const busqueda = route.query.q as string
   
   if (tipo) {
     selectedTipo.value = tipo
@@ -49,6 +50,10 @@ onMounted(async () => {
   
   if (orden) {
     selectedOrden.value = orden
+  }
+  
+  if (busqueda) {
+    searchQuery.value = busqueda
   }
   
   if (categoria) {

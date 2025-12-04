@@ -54,10 +54,10 @@ const handleVerTodos = () => {
 
         <button 
           @click="handleVerTodos"
-          class="group flex items-center gap-2 px-6 py-3 font-bold text-white bg-gradient-to-r from-primary to-purple-600 hover:from-purple-600 hover:to-primary rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          class="btn btn-error btn-outline gap-2"
         >
           <span>Ver Catálogo Completo</span>
-          <ArrowRight :size="20" class="group-hover:translate-x-1 transition-transform duration-300" />
+          <ArrowRight :size="20" />
         </button>
       </div>
     </div>

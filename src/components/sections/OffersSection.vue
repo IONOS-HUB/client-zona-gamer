@@ -1,108 +1,119 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import type { GameSummary } from '@/types/game'
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-vue-next'
-import GameCard from '@/components/ui/GameCard.vue'
+import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
+import type { GameSummary } from "@/types/game";
+import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-vue-next";
+import GameCard from "@/components/ui/GameCard.vue";
 
 interface Props {
-  games: GameSummary[]
-  title?: string
-  subtitle?: string
-  variant?: 'primary' | 'secondary'
+  games: GameSummary[];
+  title?: string;
+  subtitle?: string;
+  variant?: "primary" | "secondary";
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  title: 'Ofertas Especiales',
-  subtitle: 'Aprovecha estos precios increíbles',
-  variant: 'primary'
-})
+  title: "Ofertas Especiales",
+  subtitle: "Aprovecha estos precios increíbles",
+  variant: "primary",
+});
 
-const router = useRouter()
-const currentIndex = ref(0)
-const maxItems = 5
+const router = useRouter();
+const currentIndex = ref(0);
+const maxItems = 5;
 
-const hasGames = computed(() => props.games.length > 0)
+const hasGames = computed(() => props.games.length > 0);
 
 // Mostrar solo los primeros 10 juegos
-const displayedGames = computed(() => props.games.slice(0, maxItems))
-const hasMoreGames = computed(() => props.games.length > maxItems)
+const displayedGames = computed(() => props.games.slice(0, maxItems));
+const hasMoreGames = computed(() => props.games.length > maxItems);
 
 // Cantidad de items a mostrar en el carrusel
 const itemsPerView = computed(() => {
-  if (typeof window !== 'undefined') {
-    if (window.innerWidth >= 1536) return 6 // 2xl
-    if (window.innerWidth >= 1280) return 5 // xl
-    if (window.innerWidth >= 1024) return 4 // lg
-    if (window.innerWidth >= 768) return 3 // md
-    if (window.innerWidth >= 640) return 2 // sm
+  if (typeof window !== "undefined") {
+    if (window.innerWidth >= 1536) return 6; // 2xl
+    if (window.innerWidth >= 1280) return 5; // xl
+    if (window.innerWidth >= 1024) return 4; // lg
+    if (window.innerWidth >= 768) return 3; // md
+    if (window.innerWidth >= 640) return 2; // sm
   }
-  return 2 // default
-})
+  return 2; // default
+});
 
-const maxIndex = computed(() => Math.max(0, displayedGames.value.length - itemsPerView.value))
+const maxIndex = computed(() =>
+  Math.max(0, displayedGames.value.length - itemsPerView.value)
+);
 
-const canGoLeft = computed(() => currentIndex.value > 0)
-const canGoRight = computed(() => currentIndex.value < maxIndex.value)
+const canGoLeft = computed(() => currentIndex.value > 0);
+const canGoRight = computed(() => currentIndex.value < maxIndex.value);
 
 const scrollLeft = () => {
   if (canGoLeft.value) {
-    currentIndex.value = Math.max(0, currentIndex.value - 1)
+    currentIndex.value = Math.max(0, currentIndex.value - 1);
   }
-}
+};
 
 const scrollRight = () => {
   if (canGoRight.value) {
-    currentIndex.value = Math.min(maxIndex.value, currentIndex.value + 1)
+    currentIndex.value = Math.min(maxIndex.value, currentIndex.value + 1);
   }
-}
+};
 
 const sectionClasses = computed(() => {
-  return props.variant === 'primary' 
-    ? 'bg-gradient-to-br from-error/10 via-base-200/50 to-warning/10'
-    : 'bg-gradient-to-br from-success/10 via-base-200/50 to-info/10'
-})
+  return props.variant === "primary"
+    ? "bg-gradient-to-br from-error/10 via-base-200/50 to-warning/10"
+    : "bg-gradient-to-br from-success/10 via-base-200/50 to-info/10";
+});
 
 const badgeClasses = computed(() => {
-  return props.variant === 'primary'
-    ? 'badge-error'
-    : 'badge-success'
-})
+  return props.variant === "primary" ? "badge-error" : "badge-success";
+});
 
 const handleVerMas = () => {
-  router.push({ 
-    name: 'VerMas', 
-    query: { 
-      tipo: 'ofertas',
-      categoria: props.title 
-    } 
-  })
-}
+  router.push({
+    name: "VerMas",
+    query: {
+      tipo: "ofertas",
+      categoria: props.title,
+    },
+  });
+};
 </script>
 
 <template>
   <section v-if="hasGames" class="mb-16 animate-fadeInUp">
-    <div :class="['rounded-3xl p-6 md:p-8 border border-white/10 backdrop-blur-sm', sectionClasses]">
+    <div
+      :class="[
+        'rounded-3xl p-6 md:p-8 border border-white/10 backdrop-blur-sm',
+        sectionClasses,
+      ]"
+    >
       <!-- Header de la sección -->
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div
+        class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4"
+      >
         <div class="flex-1">
           <div class="flex items-center gap-3 mb-2">
             <span :class="['badge badge-lg font-bold', badgeClasses]">
-              {{ games.length }} {{ games.length === 1 ? 'Oferta' : 'Ofertas' }}
+              {{ games.length }} {{ games.length === 1 ? "Oferta" : "Ofertas" }}
             </span>
           </div>
-          <h2 class="text-3xl md:text-5xl font-black text-gradient-animated mb-2">
+          <h2
+            class="text-3xl md:text-5xl font-black text-gradient-animated mb-2"
+          >
             {{ title }}
           </h2>
           <p class="text-base md:text-lg text-base-content/70 font-medium">
             {{ subtitle }}
           </p>
         </div>
-        
+
         <!-- Decoración -->
         <div class="hidden lg:flex items-center gap-3">
           <div class="relative">
-            <div class="absolute inset-0 bg-error/20 blur-xl rounded-full"></div>
+            <div
+              class="absolute inset-0 bg-error/20 blur-xl rounded-full"
+            ></div>
             <Sparkles :size="64" class="text-error relative z-10" />
           </div>
         </div>
@@ -111,23 +122,26 @@ const handleVerMas = () => {
       <!-- Carrusel Container -->
       <div class="relative overflow-hidden">
         <!-- Controles de navegación -->
-        <div v-if="displayedGames.length > itemsPerView" class="absolute top-1/2 -translate-y-1/2 left-2 right-2 flex justify-between items-center pointer-events-none z-10">
-          <button 
+        <div
+          v-if="displayedGames.length > itemsPerView"
+          class="absolute top-1/2 -translate-y-1/2 left-2 right-2 flex justify-between items-center pointer-events-none z-10"
+        >
+          <button
             @click="scrollLeft"
             :disabled="!canGoLeft"
             :class="[
               'btn btn-circle bg-base-100/90 hover:bg-base-100 border-white/20 shadow-xl pointer-events-auto transition-all duration-300',
-              canGoLeft ? 'opacity-100' : 'opacity-30'
+              canGoLeft ? 'opacity-100' : 'opacity-30',
             ]"
           >
             <ChevronLeft :size="24" />
           </button>
-          <button 
+          <button
             @click="scrollRight"
             :disabled="!canGoRight"
             :class="[
               'btn btn-circle bg-base-100/90 hover:bg-base-100 border-white/20 shadow-xl pointer-events-auto transition-all duration-300',
-              canGoRight ? 'opacity-100' : 'opacity-30'
+              canGoRight ? 'opacity-100' : 'opacity-30',
             ]"
           >
             <ChevronRight :size="24" />
@@ -136,20 +150,23 @@ const handleVerMas = () => {
 
         <!-- Carrusel de juegos -->
         <div class="overflow-hidden">
-          <div 
+          <div
             class="flex transition-transform duration-500 ease-out gap-4"
-            :style="{ transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)` }"
+            :style="{
+              transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)`,
+            }"
           >
             <div
               v-for="game in displayedGames"
               :key="game.id"
-              class="flex-shrink-0"
-              :style="{ width: `calc(${100 / itemsPerView}% - ${(itemsPerView - 1) * 16 / itemsPerView}px)` }"
+              class="shrink-0"
+              :style="{
+                width: `calc(${100 / itemsPerView}% - ${
+                  ((itemsPerView - 1) * 16) / itemsPerView
+                }px)`,
+              }"
             >
-              <GameCard
-                :game="game"
-                :show-add-to-cart="true"
-              />
+              <GameCard :game="game" :show-add-to-cart="true" />
             </div>
           </div>
         </div>
@@ -157,12 +174,14 @@ const handleVerMas = () => {
         <!-- Indicadores de puntos -->
         <div v-if="maxIndex > 0" class="flex justify-center gap-2 mt-6">
           <button
-            v-for="i in (maxIndex + 1)"
+            v-for="i in maxIndex + 1"
             :key="i"
             @click="currentIndex = i - 1"
             :class="[
               'h-2 rounded-full transition-all duration-300',
-              currentIndex === i - 1 ? 'w-8 bg-error' : 'w-2 bg-base-content/30 hover:bg-base-content/50'
+              currentIndex === i - 1
+                ? 'w-8 bg-error'
+                : 'w-2 bg-base-content/30 hover:bg-base-content/50',
             ]"
           />
         </div>
@@ -172,13 +191,10 @@ const handleVerMas = () => {
       <div v-if="hasMoreGames" class="mt-10 flex justify-center">
         <button 
           @click="handleVerMas"
-          class="group relative inline-flex items-center justify-center gap-3 px-8 py-4 text-lg font-bold text-white transition-all duration-300 bg-gradient-to-r from-error via-red-600 to-orange-600 rounded-2xl hover:scale-105 hover:shadow-2xl hover:shadow-error/50 overflow-hidden"
+          class="btn btn-error btn-outline gap-2"
         >
-          <!-- Efecto de brillo animado -->
-          <div class="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-          
-          <span class="relative z-10">Ver Todas las Ofertas</span>
-          <ArrowRight :size="24" class="relative z-10 group-hover:translate-x-2 transition-transform duration-300" />
+          <span>Ver Todas las Ofertas</span>
+          <ArrowRight :size="24" />
         </button>
       </div>
     </div>
@@ -196,7 +212,8 @@ const handleVerMas = () => {
 }
 
 @keyframes gradient-shift {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% center;
   }
   50% {
