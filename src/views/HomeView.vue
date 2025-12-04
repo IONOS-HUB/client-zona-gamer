@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- Contenido Principal -->
-    <div class="container mx-auto px-4 md:px-6 py-12 relative overflow-x-hidden">
+    <div class="container mx-auto px-4 md:px-6 pt-28 pb-12 relative overflow-x-hidden">
       <!-- Efectos de fondo decorativos -->
       <div class="absolute top-1/4 left-0 w-64 h-64 bg-error/5 rounded-full blur-3xl pointer-events-none"></div>
       <div class="absolute bottom-1/4 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>

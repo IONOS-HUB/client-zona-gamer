@@ -335,9 +335,9 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
 
 <template>
   <!-- Navbar flotante con márgenes y bordes redondeados -->
-  <header class="sticky top-4 z-50 px-2 sm:px-4 animate-fadeInUp">
-    <nav class="navbar-glass shadow-2xl rounded-2xl border border-white/30">
-      <div class="container mx-auto px-3 sm:px-4 lg:px-6 relative z-10">
+  <header class="fixed top-4 left-0 right-0 z-50 px-2 sm:px-4 animate-fadeInUp">
+    <nav class="navbar-glass shadow-2xl rounded-2xl border border-white/30 container mx-auto">
+      <div class="px-3 sm:px-4 lg:px-6 relative z-10">
         <!-- Barra principal -->
         <div class="flex items-center justify-between py-3 sm:py-4 gap-2 sm:gap-4 lg:gap-6">
           <!-- Logo -->

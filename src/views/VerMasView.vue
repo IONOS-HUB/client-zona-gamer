@@ -318,7 +318,7 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
     />
 
     <!-- Contenido Principal -->
-    <div class="container mx-auto px-4 md:px-6 py-8 mt-20">
+    <div class="container mx-auto px-4 md:px-6 pt-28 pb-8">
       <!-- Header -->
       <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
         <div>
@@ -340,11 +340,11 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
         </button>
       </div>
 
-      <div class="flex flex-col lg:flex-row gap-6">
+      <div class="flex flex-col lg:flex-row gap-6 lg:items-start">
         <!-- Sidebar de filtros -->
         <aside 
           :class="[
-            'lg:w-80 bg-base-200 rounded-2xl p-6 space-y-6 border border-white/10',
+            'lg:w-80 bg-base-200 rounded-2xl p-6 space-y-6 border border-white/10 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto custom-scrollbar',
             showFilters ? 'block' : 'hidden lg:block'
           ]"
         >
@@ -519,6 +519,25 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Scrollbar personalizado para el sidebar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(220, 38, 38, 0.5);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 38, 38, 0.7);
 }
 </style>
 
