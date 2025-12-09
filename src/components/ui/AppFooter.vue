@@ -1,6 +1,41 @@
 <script setup lang="ts">
-import { Facebook, Instagram, Send } from 'lucide-vue-next'
+import { Send, Facebook, Instagram } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 import logo from '/Images/logo/logo.png'
+
+const router = useRouter()
+
+// Número de WhatsApp
+const whatsappNumber = '593992249152'
+const whatsappUrl = `https://wa.me/${whatsappNumber}`
+
+// Links de redes sociales
+const socialLinks = {
+  instagram: 'https://www.instagram.com/zonagamersecuador/',
+  threads: 'https://x.com/zonagamersec?t=P_mNPwPKWfYibsbTnGWlrw&s=09',
+  tiktok: 'https://www.tiktok.com/@zona.gamers.ecuad'
+}
+
+// Función para hacer scroll a una sección
+const scrollToSection = (sectionId: string): void => {
+  const element = document.getElementById(sectionId)
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else {
+    // Si estamos en otra página, ir a home y luego hacer scroll
+    if (router.currentRoute.value.path !== '/') {
+      router.push('/').then(() => {
+        setTimeout(() => {
+          const el = document.getElementById(sectionId)
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 300)
+      })
+    }
+  }
+}
+
 </script>
 
 <template>
@@ -15,18 +50,33 @@ import logo from '/Images/logo/logo.png'
       <div class="grid grid-cols-1 md:grid-cols-4 gap-12">
         <!-- Logo y descripción -->
         <div class="flex flex-col gap-4 animate-fadeInUp">
-          <img :src="logo" alt="Zona Gamers" class="" />
-
+          <a href="/" class="cursor-pointer">
+            <img :src="logo" alt="Zona Gamers" class="max-w-[200px]" />
+          </a>
         </div>
 
         <!-- Información -->
         <div class="animate-fadeInUp delay-100">
           <h6 class="footer-title opacity-80 mb-4 font-bold text-lg">INFORMACIÓN</h6>
           <div class="flex flex-col gap-3">
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Sobre Nosotros</a>
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Cómo Comprar</a>
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Preguntas Frecuentes</a>
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Formas de Pago</a>
+            <a 
+              @click.prevent="scrollToSection('contacto')" 
+              class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300 cursor-pointer"
+            >
+              → Sobre Nosotros
+            </a>
+            <a 
+              @click.prevent="scrollToSection('faq')" 
+              class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300 cursor-pointer"
+            >
+              → Preguntas Frecuentes
+            </a>
+            <a 
+              @click.prevent="scrollToSection('faq')" 
+              class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300 cursor-pointer"
+            >
+              → Formas de Pago
+            </a>
           </div>
         </div>
 
@@ -34,10 +84,18 @@ import logo from '/Images/logo/logo.png'
         <div class="animate-fadeInUp delay-200">
           <h6 class="footer-title opacity-80 mb-4 font-bold text-lg">SOPORTE</h6>
           <div class="flex flex-col gap-3">
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Contacto</a>
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Términos y Condiciones</a>
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Política de Privacidad</a>
-            <a class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300">→ Garantías</a>
+            <a 
+              @click.prevent="scrollToSection('contacto')" 
+              class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300 cursor-pointer"
+            >
+              → Contacto
+            </a>
+            <a 
+              @click.prevent="scrollToSection('faq')" 
+              class="link link-hover text-sm hover:text-error hover:translate-x-2 transition-all duration-300 cursor-pointer"
+            >
+              → Garantías
+            </a>
           </div>
         </div>
 
@@ -46,30 +104,48 @@ import logo from '/Images/logo/logo.png'
           <h6 class="footer-title opacity-80 mb-4 font-bold text-lg">SÍGUENOS</h6>
           <div class="flex gap-4 mb-6">
             <a 
-              href="#" 
+              :href="socialLinks.threads" 
+              target="_blank"
+              rel="noopener noreferrer"
               class="btn btn-circle btn-ghost hover:bg-error/20 hover:text-error hover:shadow-glow hover:scale-110 transition-all duration-300"
-              aria-label="Facebook"
+              aria-label="Threads / X"
+              title="Síguenos en Threads / X"
             >
-              <Facebook :size="24" />
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
             </a>
             <a 
-              href="#" 
+              :href="socialLinks.instagram" 
+              target="_blank"
+              rel="noopener noreferrer"
               class="btn btn-circle btn-ghost hover:bg-error/20 hover:text-error hover:shadow-glow hover:scale-110 transition-all duration-300"
               aria-label="Instagram"
+              title="Síguenos en Instagram"
             >
               <Instagram :size="24" />
             </a>
             <a 
-              href="#" 
+              :href="whatsappUrl" 
+              target="_blank"
+              rel="noopener noreferrer"
               class="btn btn-circle btn-ghost hover:bg-error/20 hover:text-error hover:shadow-glow hover:scale-110 transition-all duration-300"
               aria-label="WhatsApp"
+              title="Contáctanos por WhatsApp"
             >
               <Send :size="24" />
             </a>
           </div>
           <div class="glass-effect p-4 rounded-lg border border-white/10">
             <p class="text-xs text-base-content/70 mb-2 font-semibold">Atención al cliente 24/7</p>
-            <p class="text-sm font-bold text-gradient-animated">WhatsApp: +593 99 999 9999</p>
+            <a 
+              :href="whatsappUrl" 
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-sm font-bold text-gradient-animated hover:underline cursor-pointer block"
+            >
+              WhatsApp: +593 99 224 9152
+            </a>
           </div>
         </div>
       </div>

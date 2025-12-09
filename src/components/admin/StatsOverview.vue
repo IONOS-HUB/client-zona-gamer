@@ -132,7 +132,12 @@ const estadisticas = computed(() => {
   const filtered = juegosFiltrados.value
   
   const totalJuegos = filtered.length
+  const juegosSoloPS4 = filtered.filter(j => j.version === 'PS4').length
+  const juegosSoloPS5 = filtered.filter(j => j.version === 'PS5').length
+  const juegosPS4PS5 = filtered.filter(j => j.version === 'PS4 & PS5').length
+  // Compatibilidad: juegos que funcionan en PS4 (incluye PS4 & PS5)
   const juegosPS4 = filtered.filter(j => j.version === 'PS4' || j.version === 'PS4 & PS5').length
+  // Compatibilidad: juegos que funcionan en PS5 (incluye PS4 & PS5)
   const juegosPS5 = filtered.filter(j => j.version === 'PS5' || j.version === 'PS4 & PS5').length
   const juegosEnOferta = filtered.filter(j => j.tipoPromocion === 'oferta' || j.isOffert).length
   const juegosEnPromocion = filtered.filter(j => j.tipoPromocion === 'promocion').length
@@ -154,8 +159,11 @@ const estadisticas = computed(() => {
 
   return {
     totalJuegos,
-    juegosPS4,
-    juegosPS5,
+    juegosSoloPS4,
+    juegosSoloPS5,
+    juegosPS4PS5,
+    juegosPS4, // Compatibles con PS4
+    juegosPS5, // Compatibles con PS5
     juegosEnOferta,
     juegosEnPromocion,
     totalCorreos,
@@ -337,31 +345,53 @@ const verDetallesJuego = (juego: GameSummary): void => {
     <div class="card bg-base-100 shadow-xl">
       <div class="card-body">
         <h3 class="card-title text-xl mb-4">Distribución por Plataforma</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- PS4 -->
-          <div class="flex items-center justify-between p-4 bg-linear-to-r from-blue-500/10 to-transparent rounded-lg">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Solo PS4 -->
+          <div class="flex items-center justify-between p-4 bg-linear-to-r from-blue-500/10 to-transparent rounded-lg border border-blue-500/20">
             <div>
-              <p class="text-sm text-base-content/60">PlayStation 4</p>
-              <p class="text-3xl font-bold text-blue-500">{{ estadisticas.juegosPS4 }}</p>
+              <p class="text-sm text-base-content/60 font-semibold">Solo PS4</p>
+              <p class="text-3xl font-bold text-blue-500">{{ estadisticas.juegosSoloPS4 }}</p>
+              <p class="text-xs text-base-content/50 mt-1">
+                {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosSoloPS4 / estadisticas.totalJuegos * 100) : 0 }}% del total
+              </p>
             </div>
             <div class="radial-progress text-blue-500" 
-              :style="`--value:${estadisticas.totalJuegos > 0 ? (estadisticas.juegosPS4 / estadisticas.totalJuegos * 100) : 0}; --size:5rem; --thickness: 0.5rem;`">
-              {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosPS4 / estadisticas.totalJuegos * 100) : 0 }}%
+              :style="`--value:${estadisticas.totalJuegos > 0 ? (estadisticas.juegosSoloPS4 / estadisticas.totalJuegos * 100) : 0}; --size:4rem; --thickness: 0.4rem;`">
+              {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosSoloPS4 / estadisticas.totalJuegos * 100) : 0 }}%
             </div>
           </div>
 
-          <!-- PS5 -->
-          <div class="flex items-center justify-between p-4 bg-linear-to-r from-purple-500/10 to-transparent rounded-lg">
+          <!-- PS4 & PS5 -->
+          <div class="flex items-center justify-between p-4 bg-linear-to-r from-purple-500/10 to-transparent rounded-lg border border-purple-500/20">
             <div>
-              <p class="text-sm text-base-content/60">PlayStation 5</p>
-              <p class="text-3xl font-bold text-purple-500">{{ estadisticas.juegosPS5 }}</p>
+              <p class="text-sm text-base-content/60 font-semibold">PS4 & PS5</p>
+              <p class="text-3xl font-bold text-purple-500">{{ estadisticas.juegosPS4PS5 }}</p>
+              <p class="text-xs text-base-content/50 mt-1">
+                {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosPS4PS5 / estadisticas.totalJuegos * 100) : 0 }}% del total
+              </p>
             </div>
             <div class="radial-progress text-purple-500" 
-              :style="`--value:${estadisticas.totalJuegos > 0 ? (estadisticas.juegosPS5 / estadisticas.totalJuegos * 100) : 0}; --size:5rem; --thickness: 0.5rem;`">
-              {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosPS5 / estadisticas.totalJuegos * 100) : 0 }}%
+              :style="`--value:${estadisticas.totalJuegos > 0 ? (estadisticas.juegosPS4PS5 / estadisticas.totalJuegos * 100) : 0}; --size:4rem; --thickness: 0.4rem;`">
+              {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosPS4PS5 / estadisticas.totalJuegos * 100) : 0 }}%
+            </div>
+          </div>
+
+          <!-- Solo PS5 -->
+          <div class="flex items-center justify-between p-4 bg-linear-to-r from-pink-500/10 to-transparent rounded-lg border border-pink-500/20">
+            <div>
+              <p class="text-sm text-base-content/60 font-semibold">Solo PS5</p>
+              <p class="text-3xl font-bold text-pink-500">{{ estadisticas.juegosSoloPS5 }}</p>
+              <p class="text-xs text-base-content/50 mt-1">
+                {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosSoloPS5 / estadisticas.totalJuegos * 100) : 0 }}% del total
+              </p>
+            </div>
+            <div class="radial-progress text-pink-500" 
+              :style="`--value:${estadisticas.totalJuegos > 0 ? (estadisticas.juegosSoloPS5 / estadisticas.totalJuegos * 100) : 0}; --size:4rem; --thickness: 0.4rem;`">
+              {{ estadisticas.totalJuegos > 0 ? Math.round(estadisticas.juegosSoloPS5 / estadisticas.totalJuegos * 100) : 0 }}%
             </div>
           </div>
         </div>
+        
       </div>
     </div>
 
@@ -369,9 +399,9 @@ const verDetallesJuego = (juego: GameSummary): void => {
     <DashboardCharts 
       :totalJuegos="estadisticas.totalJuegos"
       :totalCorreos="estadisticas.totalCorreos"
-      :juegosPS4="estadisticas.juegosPS4"
-      :juegosPS5="estadisticas.juegosPS5"
-      :juegosPS4PS5="games.filter(j => j.version === 'PS4 & PS5').length"
+      :juegosPS4="estadisticas.juegosSoloPS4"
+      :juegosPS5="estadisticas.juegosSoloPS5"
+      :juegosPS4PS5="estadisticas.juegosPS4PS5"
       :stockTotal="estadisticas.totalStock"
     />
 

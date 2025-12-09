@@ -40,18 +40,23 @@ const props = defineProps<Props>()
 
 // Distribución por plataforma
 const plataformasData = computed(() => {
+  const total = props.juegosPS4PS5 + props.juegosPS4 + props.juegosPS5
   return {
-    labels: ['PS4 & PS5', 'Solo PS4', 'Solo PS5'],
+    labels: [
+      `Solo PS4 (${props.juegosPS4})`,
+      `PS4 & PS5 (${props.juegosPS4PS5})`,
+      `Solo PS5 (${props.juegosPS5})`
+    ],
     datasets: [{
-      data: [props.juegosPS4PS5, props.juegosPS4, props.juegosPS5],
+      data: [props.juegosPS4, props.juegosPS4PS5, props.juegosPS5],
       backgroundColor: [
-        'rgba(139, 92, 246, 0.7)',
-        'rgba(59, 130, 246, 0.7)',
-        'rgba(236, 72, 153, 0.7)'
+        'rgba(59, 130, 246, 0.7)',   // Azul para PS4
+        'rgba(139, 92, 246, 0.7)',   // Púrpura para PS4 & PS5
+        'rgba(236, 72, 153, 0.7)'    // Rosa para PS5
       ],
       borderColor: [
-        'rgba(139, 92, 246, 1)',
         'rgba(59, 130, 246, 1)',
+        'rgba(139, 92, 246, 1)',
         'rgba(236, 72, 153, 1)'
       ],
       borderWidth: 2

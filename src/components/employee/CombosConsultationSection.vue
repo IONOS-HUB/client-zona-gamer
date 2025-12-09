@@ -57,10 +57,20 @@ const sortOrder = ref<'asc' | 'desc'>('asc')
 const combosFiltrados = computed(() => {
   let resultado = combos.value
 
-  // Filtro por plataforma
-  if (plataformaSeleccionada.value !== 'PS4 & PS5') {
+  // Filtro por plataforma según el campo version del combo
+  // Todos los combos están en combos/PS4 & PS5/combos/, pero cada uno tiene su campo version
+  if (plataformaSeleccionada.value === 'PS4 & PS5') {
+    // Mostrar todos los combos sin filtrar por versión
+    // No filtrar, mostrar todos
+  } else if (plataformaSeleccionada.value === 'PS4') {
+    // Mostrar solo combos que tienen version === 'PS4' o version === 'PS4 & PS5'
     resultado = resultado.filter(
-      combo => combo.version === plataformaSeleccionada.value || combo.version === 'PS4 & PS5'
+      combo => combo.version === 'PS4' || combo.version === 'PS4 & PS5'
+    )
+  } else if (plataformaSeleccionada.value === 'PS5') {
+    // Mostrar solo combos que tienen version === 'PS5' o version === 'PS4 & PS5'
+    resultado = resultado.filter(
+      combo => combo.version === 'PS5' || combo.version === 'PS4 & PS5'
     )
   }
 
@@ -108,12 +118,15 @@ const combosFiltrados = computed(() => {
 // Funciones principales
 const cargarCombosPorPlataforma = async (): Promise<void> => {
   if (vistaActual.value === 'combos') comboSeleccionado.value = null
-  await cargarCombos(plataformaSeleccionada.value, false)
+  // Siempre cargar desde 'PS4 & PS5' porque todos los combos están ahí
+  // El filtrado por plataforma se hace en combosFiltrados según el campo version
+  await cargarCombos('PS4 & PS5', false)
 }
 
 const handleSincronizar = async (): Promise<void> => {
   try {
-    await sincronizarCombos(plataformaSeleccionada.value)
+    // Siempre sincronizar desde 'PS4 & PS5' porque todos los combos están ahí
+    await sincronizarCombos('PS4 & PS5')
   } catch (error) {
     console.error('Error sincronizando:', error)
   }
@@ -236,7 +249,7 @@ const abrirModalWhatsApp = async (correo: ComboEmailAccount, version?: 'PS4' | '
 
     const mensaje = await generarYEliminarCodigosCombo(
       correo,
-      plataformaSeleccionada.value,
+      'PS4 & PS5', // Siempre usar 'PS4 & PS5' porque todos los combos están ahí
       comboId,
       comboSeleccionado.value.nombre,
       currentUserData.value.uid,
@@ -317,7 +330,7 @@ const handleGuardarCliente = async (datos: { nombre: string; telefono: string; t
     }
 
     await actualizarCorreoCombo(
-      plataformaSeleccionada.value,
+      'PS4 & PS5', // Siempre usar 'PS4 & PS5' porque todos los combos están ahí
       comboId,
       correo.correo,
       { cuentas: cuentasActualizadas }
@@ -387,7 +400,8 @@ const iniciarSincronizacionAutomatica = (): void => {
   syncInterval = setInterval(async () => {
     if (plataformaSeleccionada.value) {
       try {
-        await sincronizarCombos(plataformaSeleccionada.value)
+        // Siempre sincronizar desde 'PS4 & PS5' porque todos los combos están ahí
+        await sincronizarCombos('PS4 & PS5')
       } catch (error) {
         console.error('Error en sincronización automática:', error)
       }
@@ -452,7 +466,7 @@ defineExpose({
             <div class="form-control">
               <label class="label"><span class="label-text font-semibold">Plataforma</span></label>
               <select v-model="plataformaSeleccionada" class="select select-bordered">
-                <option value="PS4 & PS5">PS4 & PS5</option>
+                <option value="PS4 & PS5">Todas (PS4 & PS5)</option>
                 <option value="PS4">PS4</option>
                 <option value="PS5">PS5</option>
               </select>

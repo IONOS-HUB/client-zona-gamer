@@ -22,7 +22,7 @@ const faqs: FAQ[] = [
   {
     id: '3',
     question: '¿Qué métodos de pago aceptan?',
-    answer: 'Aceptamos múltiples métodos de pago incluyendo tarjetas de crédito/débito, PayPal, transferencias bancarias y otros métodos de pago locales según tu región.'
+    answer: 'Aceptamos múltiples métodos de pago incluyendo PayPal, transferencias bancarias y otros métodos de pago locales según tu región.'
   },
   {
     id: '4',
@@ -63,7 +63,7 @@ const toggleItem = (id: string): void => {
 </script>
 
 <template>
-  <div class="w-full bg-base-200 py-12 md:py-16">
+  <div id="faq" class="w-full bg-base-200 py-12 md:py-16">
     <div class="container mx-auto px-4 md:px-6">
       <!-- Header -->
       <div class="text-center mb-12">

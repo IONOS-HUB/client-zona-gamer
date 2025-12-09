@@ -102,11 +102,16 @@ const emailFormError = ref('')
 // Computed para juegos filtrados
 const juegosFiltrados = computed(() => {
   let resultado = games.value.filter(juego => {
-    if (plataformaSeleccionada.value === 'PS4 & PS5') return true
-    if (plataformaSeleccionada.value === 'PS4') {
+    // Filtro por plataforma según el campo version del juego
+    // Todos los juegos están en games/PS4 & PS5/juegos/, pero cada uno tiene su campo version
+    if (plataformaSeleccionada.value === 'PS4 & PS5') {
+      // Mostrar todos los juegos sin filtrar por versión
+      return true
+    } else if (plataformaSeleccionada.value === 'PS4') {
+      // Mostrar solo juegos que tienen version === 'PS4' o version === 'PS4 & PS5'
       return juego.version === 'PS4' || juego.version === 'PS4 & PS5'
-    }
-    if (plataformaSeleccionada.value === 'PS5') {
+    } else if (plataformaSeleccionada.value === 'PS5') {
+      // Mostrar solo juegos que tienen version === 'PS5' o version === 'PS4 & PS5'
       return juego.version === 'PS5' || juego.version === 'PS4 & PS5'
     }
     return true
@@ -178,12 +183,15 @@ const correosFiltrados = computed(() => {
 // Funciones principales
 const cargarJuegosPorPlataforma = async (): Promise<void> => {
   if (vistaActual.value === 'juegos') juegoSeleccionado.value = null
-  await cargarJuegos(plataformaSeleccionada.value, false)
+  // Siempre cargar desde 'PS4 & PS5' porque todos los juegos están ahí
+  // El filtrado por plataforma se hace en juegosFiltrados según el campo version
+  await cargarJuegos('PS4 & PS5', false)
 }
 
 const handleSincronizar = async (): Promise<void> => {
   try {
-    await sincronizarJuegos(plataformaSeleccionada.value)
+    // Siempre sincronizar desde 'PS4 & PS5' porque todos los juegos están ahí
+    await sincronizarJuegos('PS4 & PS5')
     successMessage.value = 'Juegos sincronizados exitosamente'
     setTimeout(() => { successMessage.value = '' }, 3000)
   } catch (error) {
@@ -264,7 +272,7 @@ const abrirModalWhatsApp = async (correo: GameEmailAccount, version?: 'PS4' | 'P
     const juegoId = generarIdJuego(juegoSeleccionado.value.nombre)
     const mensaje = await generarYEliminarCodigos(
       correo,
-      plataformaSeleccionada.value,
+      'PS4 & PS5', // Siempre usar 'PS4 & PS5' porque todos los juegos están ahí
       juegoId,
       juegoSeleccionado.value.nombre,
       currentUserData.value.uid,
@@ -393,7 +401,7 @@ const handleGuardarCliente = async (datos: { nombre: string; telefono: string; t
     }
 
     await actualizarCorreoJuego(
-      plataformaSeleccionada.value,
+      'PS4 & PS5', // Siempre usar 'PS4 & PS5' porque todos los juegos están ahí
       juegoId,
       correo.correo,
       { cuentas: cuentasActualizadas }
@@ -446,7 +454,8 @@ const buscarTelefono = async (): Promise<void> => {
 
   isLoadingTelefono.value = true
   try {
-    resultadosTelefono.value = await buscarPorTelefono(telefonoBusqueda.value.trim(), plataformaSeleccionada.value)
+    // Siempre buscar en 'PS4 & PS5' porque todos los juegos están ahí
+    resultadosTelefono.value = await buscarPorTelefono(telefonoBusqueda.value.trim(), 'PS4 & PS5')
   } catch (error) {
     console.error('Error buscando teléfono:', error)
   } finally {
@@ -462,7 +471,8 @@ const buscarCorreo = async (): Promise<void> => {
 
   isLoadingCorreo.value = true
   try {
-    resultadosCorreo.value = await buscarPorCorreo(correoBusqueda.value.trim(), plataformaSeleccionada.value)
+    // Siempre buscar en 'PS4 & PS5' porque todos los juegos están ahí
+    resultadosCorreo.value = await buscarPorCorreo(correoBusqueda.value.trim(), 'PS4 & PS5')
   } catch (error) {
     console.error('Error buscando correo:', error)
   } finally {
@@ -675,7 +685,8 @@ const iniciarSincronizacionAutomatica = (): void => {
   syncInterval = setInterval(async () => {
     if (plataformaSeleccionada.value) {
       try {
-        await sincronizarJuegos(plataformaSeleccionada.value)
+        // Siempre sincronizar desde 'PS4 & PS5' porque todos los juegos están ahí
+        await sincronizarJuegos('PS4 & PS5')
       } catch (error) {
         console.error('Error en sincronización automática:', error)
       }
@@ -731,7 +742,7 @@ defineExpose({
             @change="cargarJuegosPorPlataforma"
             :disabled="vistaActual === 'correos'"
           >
-            <option value="PS4 & PS5">PS4 & PS5</option>
+            <option value="PS4 & PS5">Todas (PS4 & PS5)</option>
             <option value="PS4">PS4</option>
             <option value="PS5">PS5</option>
           </select>

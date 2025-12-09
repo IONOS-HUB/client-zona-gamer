@@ -14,7 +14,7 @@ const googleMapsEmbedUrl = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!
 </script>
 
 <template>
-  <section class="relative py-16 bg-gradient-to-b from-base-200 via-base-300 to-base-200 overflow-hidden">
+  <section id="contacto" class="relative py-16 bg-gradient-to-b from-base-200 via-base-300 to-base-200 overflow-hidden">
     <!-- Efectos decorativos -->
     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-error via-orange-500 to-error"></div>
     <div class="absolute top-1/4 left-0 w-64 h-64 bg-error/5 rounded-full blur-3xl pointer-events-none"></div>
