@@ -41,6 +41,8 @@ https://vm.tiktok.com/ZMSN4qThS/
 
 CORREO: ${correo}
 
+CONTRASEÑA DEL CORREO: ${password}
+
 CODIGO DE Verificacion: ${codigo1}
 
 CODIGO DE Verficacion de Respaldo: ${codigo2}`
@@ -52,6 +54,8 @@ Por favor sigue los pasos del siguiente video de Tiktok, recuerda seguirnos y gu
 https://vm.tiktok.com/ZMBx8613x/
 
 CORREO: ${correo}
+
+CONTRASEÑA DEL CORREO: ${password}
 
 CODIGO DE Verificacion: ${codigo1}
 
@@ -165,6 +169,30 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
   }
 
   /**
+   * Obtiene la contraseña de la cuenta Secundaria PS4
+   * Si no existe, usa el codigoMaster como fallback
+   */
+  const obtenerContraseñaSecundariaPS4 = (correo: EmailAccount): string | null => {
+    if (!correo.cuentas || !Array.isArray(correo.cuentas)) {
+      // Fallback al codigoMaster si no hay cuentas
+      return correo.codigoMaster || null
+    }
+
+    // Buscar la cuenta Secundaria PS4
+    const cuentaSecundariaPS4 = correo.cuentas.find(
+      cuenta => cuenta?.tipo === 'Secundaria PS4'
+    )
+
+    // Si existe y tiene contraseña, usarla
+    if (cuentaSecundariaPS4?.contraseña && cuentaSecundariaPS4.contraseña.trim() !== '') {
+      return cuentaSecundariaPS4.contraseña
+    }
+
+    // Fallback al codigoMaster si no se encuentra la contraseña de Secundaria PS4
+    return correo.codigoMaster || null
+  }
+
+  /**
    * Genera el mensaje completo de WhatsApp
    */
   const generarMensajeWhatsApp = (
@@ -179,9 +207,10 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
         return null
       }
 
-      // Validar que haya código master (contraseña)
-      if (!correo.codigoMaster || correo.codigoMaster.trim() === '') {
-        error.value = 'No hay contraseña (código master) disponible'
+      // Obtener la contraseña de la cuenta Secundaria PS4
+      const password = obtenerContraseñaSecundariaPS4(correo)
+      if (!password || password.trim() === '') {
+        error.value = 'No hay contraseña disponible (se requiere contraseña de cuenta Secundaria PS4 o código master)'
         return null
       }
 
@@ -206,7 +235,7 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
       // Generar el mensaje
       const mensajeCompleto = generarMensaje(
         correo.correo,
-        correo.codigoMaster,
+        password,
         codigo1,
         codigo2,
         version
@@ -214,7 +243,7 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
 
       return {
         correo: correo.correo,
-        password: correo.codigoMaster,
+        password: password,
         codigoVerificacion1: codigo1,
         codigoVerificacion2: codigo2,
         version,
@@ -242,8 +271,10 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
         return null
       }
 
-      if (!correo.codigoMaster || correo.codigoMaster.trim() === '') {
-        error.value = 'No hay contraseña (código master) disponible'
+      // Obtener la contraseña de la cuenta Secundaria PS4
+      const password = obtenerContraseñaSecundariaPS4(correo)
+      if (!password || password.trim() === '') {
+        error.value = 'No hay contraseña disponible (se requiere contraseña de cuenta Secundaria PS4 o código master)'
         return null
       }
 
@@ -257,7 +288,7 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
 
       const mensajeCompleto = generarMensaje(
         correo.correo,
-        correo.codigoMaster,
+        password,
         codigo1,
         codigo2,
         versionSeleccionada
@@ -265,7 +296,7 @@ CODIGO DE Verficacion de Respaldo: ${codigo2}`
 
       return {
         correo: correo.correo,
-        password: correo.codigoMaster,
+        password: password,
         codigoVerificacion1: codigo1,
         codigoVerificacion2: codigo2,
         version: versionSeleccionada,
