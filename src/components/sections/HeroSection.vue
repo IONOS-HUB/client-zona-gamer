@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, onUnmounted, computed, ref } from 'vue'
 import { MessageCircle, Gamepad2, Star } from 'lucide-vue-next'
 import { useCartStore } from '@/stores/cart'
 import type { GameSummary } from '@/types/game'
@@ -11,18 +11,43 @@ interface Props {
 const props = defineProps<Props>()
 const cartStore = useCartStore()
 
-// Variables para masonry (ya no necesitamos carrusel)
+// Referencias a las columnas del masonry
+const columnRefs = ref<(HTMLElement | null)[]>([])
+let scrollIntervals: (number | null)[] = []
+let reorderInterval: number | null = null
+const shuffledGames = ref<GameSummary[]>([])
 
 // Obtener más juegos para el masonry (necesitamos más imágenes)
-const featuredGames = computed(() => {
+const allFeaturedGames = computed(() => {
   return props.games
     .filter(game => game.activo !== false && game.foto)
-    .slice(0, 12) // Más juegos para el masonry
+    .slice(0, 18) // Más juegos para mejor efecto
 })
 
-// Crear columnas para masonry con diferentes alturas
+// Función para mezclar array aleatoriamente (Fisher-Yates)
+const shuffleArray = (array: GameSummary[]): GameSummary[] => {
+  const shuffled = array.filter((game): game is GameSummary => game !== undefined && game !== null)
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = shuffled[i]
+    if (temp && shuffled[j]) {
+      shuffled[i] = shuffled[j]
+      shuffled[j] = temp
+    }
+  }
+  return shuffled
+}
+
+// Reordenar juegos periódicamente
+const reorderGames = () => {
+  if (allFeaturedGames.value.length > 0) {
+    shuffledGames.value = shuffleArray(allFeaturedGames.value)
+  }
+}
+
+// Crear columnas para masonry con diferentes alturas y duplicar contenido para loop infinito
 const masonryColumns = computed(() => {
-  const games = featuredGames.value
+  const games = shuffledGames.value.length > 0 ? shuffledGames.value : allFeaturedGames.value
   if (games.length === 0) return [[], [], []]
   
   // Dividir en 3 columnas para efecto masonry
@@ -35,8 +60,96 @@ const masonryColumns = computed(() => {
       }
     }
   })
-  return columns
+  
+  // Duplicar cada columna para crear efecto de loop infinito
+  return columns.map(column => [...column, ...column, ...column])
 })
+
+// Estado de pausa para cada columna
+const isPaused = ref(false)
+
+// Auto-scroll independiente para cada columna (ascensor)
+const startAutoScroll = () => {
+  const scrollSpeed = 0.5 // píxeles por frame
+  // Direcciones alternadas: abajo, arriba, abajo (para 3 columnas)
+  // En responsive (2 columnas): abajo, arriba
+  const scrollDirections = [1, -1, 1] // Direcciones: abajo, arriba, abajo
+  
+  // Esperar un momento para que el DOM esté completamente renderizado
+  setTimeout(() => {
+    columnRefs.value.forEach((column, index) => {
+      if (!column) return
+      
+      let scrollPosition = 0
+      const direction = scrollDirections[index] || 1
+      const columnContent = column.querySelector('.masonry-column-content') as HTMLElement
+      
+      if (!columnContent) return
+      
+      // Obtener altura de un tercio del contenido (ya que está duplicado 3 veces)
+      const getSegmentHeight = () => {
+        const items = columnContent.querySelectorAll('.masonry-item')
+        if (items.length === 0) return 0
+        const segmentCount = 3
+        const segmentLength = Math.floor(items.length / segmentCount)
+        let height = 0
+        for (let i = 0; i < segmentLength; i++) {
+          const item = items[i] as HTMLElement
+          if (item) {
+            height += item.offsetHeight + 12 // 12px es el gap
+          }
+        }
+        return height
+      }
+      
+      const segmentHeight = getSegmentHeight()
+      
+      const scroll = () => {
+        if (!column || !columnContent || isPaused.value) return
+        
+        scrollPosition += scrollSpeed * direction
+        
+        // Loop infinito: cuando llegamos al final de un segmento, reiniciamos
+        if (direction > 0) {
+          // Scroll hacia abajo
+          if (scrollPosition >= segmentHeight) {
+            scrollPosition = scrollPosition - segmentHeight
+          }
+        } else {
+          // Scroll hacia arriba
+          if (scrollPosition <= -segmentHeight) {
+            scrollPosition = scrollPosition + segmentHeight
+          }
+        }
+        
+        columnContent.style.transform = `translateY(${scrollPosition}px)`
+      }
+      
+      const intervalId = window.setInterval(scroll, 16) // ~60fps
+      scrollIntervals[index] = intervalId
+    })
+  }, 100)
+}
+
+// Pausar scroll al hacer hover
+const pauseScroll = () => {
+  isPaused.value = true
+}
+
+// Reanudar scroll al salir del hover
+const resumeScroll = () => {
+  isPaused.value = false
+}
+
+// Detener auto-scroll
+const stopAutoScroll = () => {
+  scrollIntervals.forEach((intervalId) => {
+    if (intervalId) {
+      clearInterval(intervalId)
+    }
+  })
+  scrollIntervals = []
+}
 
 const handleWhatsApp = () => {
   const mensaje = '¡Hola! Me gustaría obtener información sobre sus juegos disponibles.'
@@ -56,11 +169,26 @@ const handleAddToCart = (game: GameSummary | undefined) => {
 }
 
 onMounted(() => {
-  // No necesitamos auto-rotate para masonry
+  // Inicializar con juegos mezclados
+  reorderGames()
+  
+  // Reordenar juegos cada 15 segundos
+  reorderInterval = window.setInterval(() => {
+    reorderGames()
+  }, 15000)
+  
+  // Iniciar auto-scroll después de un pequeño delay para que el DOM esté listo
+  setTimeout(() => {
+    startAutoScroll()
+  }, 500)
 })
 
 onUnmounted(() => {
-  // Cleanup si es necesario
+  stopAutoScroll()
+  if (reorderInterval) {
+    clearInterval(reorderInterval)
+    reorderInterval = null
+  }
 })
 </script>
 
@@ -157,22 +285,28 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Lado Derecho: Masonry Layout -->
-        <div class="relative h-[500px] sm:h-[600px] lg:h-[700px] animate-fadeInRight mt-8 lg:mt-0 overflow-hidden" v-if="featuredGames.length > 0">
-          <div class="masonry-container h-full">
+        <!-- Lado Derecho: Masonry Layout con carrusel tipo ascensor -->
+        <div class="relative h-[500px] sm:h-[600px] lg:h-[700px] animate-fadeInRight mt-8 lg:mt-0 overflow-hidden" v-if="allFeaturedGames.length > 0">
+          <div 
+            class="masonry-container h-full"
+            @mouseenter="pauseScroll"
+            @mouseleave="resumeScroll"
+          >
             <div 
               v-for="(column, colIndex) in masonryColumns" 
               :key="colIndex"
-              class="masonry-column"
+              :ref="(el) => { if (el) columnRefs[colIndex] = el as HTMLElement }"
+              class="masonry-column-wrapper"
             >
-              <div
-                v-for="(game, gameIndex) in column"
-                :key="game.id"
-                class="masonry-item"
-                :style="{ 
-                  animationDelay: `${(colIndex * 0.2) + (gameIndex * 0.15)}s`
-                }"
-              >
+              <div class="masonry-column-content">
+                <div
+                  v-for="(game, gameIndex) in column"
+                  :key="`${game.id}-${gameIndex}`"
+                  class="masonry-item"
+                  :style="{ 
+                    animationDelay: `${(colIndex * 0.2) + (gameIndex * 0.1)}s`
+                  }"
+                >
                 <div class="relative w-full group cursor-pointer" @click="handleAddToCart(game)">
                   <!-- Imagen -->
                   <div class="relative w-full overflow-hidden rounded-lg sm:rounded-xl">
@@ -205,6 +339,7 @@ onUnmounted(() => {
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -365,14 +500,21 @@ onUnmounted(() => {
   gap: 0.75rem;
   padding: 0.5rem;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
-.masonry-column {
+.masonry-column-wrapper {
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.masonry-column-content {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  transition: transform 0.1s linear;
+  will-change: transform;
 }
 
 .masonry-item {
@@ -381,7 +523,7 @@ onUnmounted(() => {
   overflow: hidden;
   animation: fadeInUp 0.6s ease-out both;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, opacity 0.5s ease;
   display: flex;
   flex-direction: column;
 }
@@ -438,6 +580,10 @@ onUnmounted(() => {
   
   .masonry-item {
     border-radius: 0.375rem;
+  }
+  
+  .masonry-column-wrapper {
+    gap: 0.5rem;
   }
 }
 </style>
