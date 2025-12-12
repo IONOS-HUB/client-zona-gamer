@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { MessageCircle, Gamepad2, TrendingUp, Star, ShoppingCart } from 'lucide-vue-next'
+import { onMounted, onUnmounted, computed } from 'vue'
+import { MessageCircle, Gamepad2, Star } from 'lucide-vue-next'
 import { useCartStore } from '@/stores/cart'
 import type { GameSummary } from '@/types/game'
 
@@ -11,47 +11,32 @@ interface Props {
 const props = defineProps<Props>()
 const cartStore = useCartStore()
 
-const currentGameIndex = ref(0)
-const isAnimating = ref(false)
-let intervalId: number | null = null
+// Variables para masonry (ya no necesitamos carrusel)
 
-// Obtener juegos destacados para el hero
+// Obtener más juegos para el masonry (necesitamos más imágenes)
 const featuredGames = computed(() => {
   return props.games
     .filter(game => game.activo !== false && game.foto)
-    .slice(0, 6)
+    .slice(0, 12) // Más juegos para el masonry
 })
 
-const currentGame = computed(() => {
-  return featuredGames.value[currentGameIndex.value]
-})
-
-const nextGames = computed(() => {
+// Crear columnas para masonry con diferentes alturas
+const masonryColumns = computed(() => {
   const games = featuredGames.value
-  const next1 = games[(currentGameIndex.value + 1) % games.length]
-  const next2 = games[(currentGameIndex.value + 2) % games.length]
-  return [next1, next2]
+  if (games.length === 0) return [[], [], []]
+  
+  // Dividir en 3 columnas para efecto masonry
+  const columns: GameSummary[][] = [[], [], []]
+  games.forEach((game, index) => {
+    if (game) {
+      const columnIndex = index % 3
+      if (columnIndex >= 0 && columnIndex < columns.length) {
+        columns[columnIndex]?.push(game)
+      }
+    }
+  })
+  return columns
 })
-
-const nextGame = () => {
-  if (featuredGames.value.length === 0) return
-  isAnimating.value = true
-  setTimeout(() => {
-    currentGameIndex.value = (currentGameIndex.value + 1) % featuredGames.value.length
-    isAnimating.value = false
-  }, 500)
-}
-
-const prevGame = () => {
-  if (featuredGames.value.length === 0) return
-  isAnimating.value = true
-  setTimeout(() => {
-    currentGameIndex.value = currentGameIndex.value === 0 
-      ? featuredGames.value.length - 1 
-      : currentGameIndex.value - 1
-    isAnimating.value = false
-  }, 500)
-}
 
 const handleWhatsApp = () => {
   const mensaje = '¡Hola! Me gustaría obtener información sobre sus juegos disponibles.'
@@ -71,16 +56,11 @@ const handleAddToCart = (game: GameSummary | undefined) => {
 }
 
 onMounted(() => {
-  // Auto-rotate cada 5 segundos
-  intervalId = window.setInterval(() => {
-    nextGame()
-  }, 5000)
+  // No necesitamos auto-rotate para masonry
 })
 
 onUnmounted(() => {
-  if (intervalId) {
-    clearInterval(intervalId)
-  }
+  // Cleanup si es necesario
 })
 </script>
 
@@ -177,111 +157,56 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Lado Derecho: Carrusel de Juegos -->
-        <div class="relative h-[400px] sm:h-[500px] lg:h-[600px] animate-fadeInRight mt-8 lg:mt-0" v-if="featuredGames.length > 0">
-          <!-- Juego Principal -->
-          <div 
-            class="absolute inset-0 flex items-center justify-center transition-all duration-500"
-            :class="{ 'opacity-0 scale-95': isAnimating, 'opacity-100 scale-100': !isAnimating }"
-          >
-            <div class="relative w-full max-w-[252px] sm:max-w-[345px] md:max-w-[403px] mx-auto">
-              <!-- Glow effect -->
-              <div class="absolute inset-0 bg-error/20 blur-3xl rounded-3xl"></div>
-              
-              <!-- Card principal -->
-              <div class="relative bg-base-100/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 shadow-2xl border border-white/10 overflow-hidden">
-                <!-- Badge de oferta -->
-                <div 
-                  v-if="currentGame?.descuento && currentGame.descuento > 0"
-                  class="absolute top-3 right-3 sm:top-4 sm:right-4 md:top-6 md:right-6 z-10 bg-error text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-bold text-xs sm:text-sm shadow-lg"
-                >
-                  -{{ currentGame.descuento }}%
-                </div>
-
-                <!-- Imagen -->
-                <div class="relative aspect-3/4 overflow-hidden rounded-xl sm:rounded-2xl">
-                  <img 
-                    v-if="currentGame?.foto"
-                    :src="currentGame.foto" 
-                    :alt="currentGame.nombre"
-                    class="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700"
-                  />
-                  <div class="absolute inset-0 bg-linear-gradient(to top, #1a1a1a, transparent)"></div>
-                  
-                  <!-- Información superpuesta -->
-                  <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 text-white space-y-2 sm:space-y-3">
-                    <h3 class="text-base sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2 line-clamp-2">{{ currentGame?.nombre }}</h3>
-                    <div class="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3 flex-wrap">
-                      <span class="badge badge-error badge-sm sm:badge-md">{{ currentGame?.version }}</span>
-                      <span v-if="currentGame?.tipoPromocion && currentGame.tipoPromocion !== 'ninguna'" class="badge badge-warning badge-sm sm:badge-md">
-                        {{ currentGame.tipoPromocion }}
-                      </span>
+        <!-- Lado Derecho: Masonry Layout -->
+        <div class="relative h-[500px] sm:h-[600px] lg:h-[700px] animate-fadeInRight mt-8 lg:mt-0 overflow-hidden" v-if="featuredGames.length > 0">
+          <div class="masonry-container h-full">
+            <div 
+              v-for="(column, colIndex) in masonryColumns" 
+              :key="colIndex"
+              class="masonry-column"
+            >
+              <div
+                v-for="(game, gameIndex) in column"
+                :key="game.id"
+                class="masonry-item"
+                :style="{ 
+                  animationDelay: `${(colIndex * 0.2) + (gameIndex * 0.15)}s`
+                }"
+              >
+                <div class="relative w-full group cursor-pointer" @click="handleAddToCart(game)">
+                  <!-- Imagen -->
+                  <div class="relative w-full overflow-hidden rounded-lg sm:rounded-xl">
+                    <img 
+                      v-if="game?.foto"
+                      :src="game.foto" 
+                      :alt="game.nombre"
+                      class="w-full h-auto object-contain transform group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <!-- Overlay con gradiente -->
+                    <div class="absolute inset-0 bg-linear-gradient(to top, rgba(0,0,0,0.8), transparent) opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    
+                    <!-- Badge de oferta -->
+                    <div 
+                      v-if="game?.descuento && game.descuento > 0"
+                      class="absolute top-2 right-2 z-10 bg-error text-white px-2 py-1 rounded-full font-bold text-xs shadow-lg"
+                    >
+                      -{{ game.descuento }}%
                     </div>
                     
-                    <!-- Botón agregar al carrito -->
-                    <button 
-                      @click="handleAddToCart(currentGame)"
-                      class="btn btn-error btn-sm sm:btn-md btn-block gap-1.5 sm:gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 mb-12 sm:mb-14 md:mb-16"
-                    >
-                      <ShoppingCart :size="16" class="sm:w-5 sm:h-5" />
-                      <span class="text-xs sm:text-sm md:text-base">Agregar al Carrito</span>
-                    </button>
+                    <!-- Información en hover -->
+                    <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                      <h3 class="text-sm sm:text-base font-bold text-white mb-1 line-clamp-2">{{ game.nombre }}</h3>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="badge badge-error badge-xs sm:badge-sm">{{ game.version }}</span>
+                        <span v-if="game?.tipoPromocion && game.tipoPromocion !== 'ninguna'" class="badge badge-warning badge-xs sm:badge-sm">
+                          {{ game.tipoPromocion }}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- Juegos secundarios (stack) -->
-          <div class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-8 space-y-4 hidden lg:block">
-            <div 
-              v-for="(game, index) in nextGames" 
-              :key="game?.id"
-              class="w-28 h-40 rounded-xl overflow-hidden shadow-lg transform transition-all duration-300 hover:scale-105 cursor-pointer border-2 border-white/20"
-              :style="{ transform: `translateX(-${index * 20}px) scale(${1 - index * 0.1})`, opacity: 1 - index * 0.3 }"
-              @click="nextGame"
-            >
-              <img 
-                v-if="game?.foto"
-                :src="game.foto" 
-                :alt="game.nombre"
-                class="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-
-          <!-- Controles de navegación -->
-          <div class="absolute -bottom-2 sm:bottom-0 md:bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 md:gap-4 bg-base-100/80 backdrop-blur-xl rounded-full px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 shadow-lg border border-white/10 z-20">
-            <button 
-              @click="prevGame"
-              class="btn btn-circle btn-xs sm:btn-sm btn-ghost hover:btn-error transition-all"
-              :disabled="featuredGames.length <= 1"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            
-            <!-- Indicadores -->
-            <div class="flex gap-1 sm:gap-1.5 md:gap-2">
-              <button 
-                v-for="(game, index) in featuredGames" 
-                :key="game.id"
-                @click="currentGameIndex = index"
-                class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300"
-                :class="index === currentGameIndex ? 'bg-error w-4 sm:w-5 md:w-6' : 'bg-base-content/30'"
-              />
-            </div>
-            
-            <button 
-              @click="nextGame"
-              class="btn btn-circle btn-xs sm:btn-sm btn-ghost hover:btn-error transition-all"
-              :disabled="featuredGames.length <= 1"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
           </div>
         </div>
       </div>
@@ -430,6 +355,89 @@ onUnmounted(() => {
 @media (hover: none) and (pointer: coarse) {
   button:active {
     transform: scale(0.98);
+  }
+}
+
+/* Masonry Layout Styles */
+.masonry-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  padding: 0.5rem;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.masonry-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.masonry-item {
+  width: 100%;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  animation: fadeInUp 0.6s ease-out both;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.masonry-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar styling para masonry */
+.masonry-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.masonry-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.masonry-container::-webkit-scrollbar-thumb {
+  background: rgba(239, 68, 68, 0.5);
+  border-radius: 10px;
+}
+
+.masonry-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(239, 68, 68, 0.7);
+}
+
+/* Responsive masonry */
+@media (max-width: 1024px) {
+  .masonry-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .masonry-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    padding: 0.25rem;
+  }
+  
+  .masonry-item {
+    border-radius: 0.375rem;
   }
 }
 </style>
