@@ -4,12 +4,14 @@ import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/config/firebase'
 import { hasDayChanged } from '@/composables/useAuth'
-import HomeView from '@/views/HomeView.vue'
-import VerMasView from '@/views/VerMasView.vue'
-import LoginView from '@/views/auth/LoginView.vue'
-import AdminDashboard from '@/views/admin/AdminDashboard.vue'
-import EmployeeDashboard from '@/views/employee/EmployeeDashboard.vue'
-import NotFoundView from '@/views/NotFoundView.vue'
+
+// Lazy load views for code splitting
+const HomeView = () => import('@/views/HomeView.vue')
+const VerMasView = () => import('@/views/VerMasView.vue')
+const LoginView = () => import('@/views/auth/LoginView.vue')
+const AdminDashboard = () => import('@/views/admin/AdminDashboard.vue')
+const EmployeeDashboard = () => import('@/views/employee/EmployeeDashboard.vue')
+const NotFoundView = () => import('@/views/NotFoundView.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
