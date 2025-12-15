@@ -263,7 +263,7 @@ const stopAutoScroll = () => {
 
 const handleWhatsApp = () => {
   const mensaje = '¡Hola! Me gustaría obtener información sobre sus juegos disponibles.'
-  const numeroWhatsApp = '593992249152'
+  const numeroWhatsApp = '593998480376'
   const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensaje)}`
   window.open(urlWhatsApp, '_blank')
 }

@@ -148,7 +148,7 @@ const handleCheckout = (): void => {
   mensaje += 'Espero su confirmación. ¡Gracias!'
   
   // Número de WhatsApp (formato internacional sin +)
-  const numeroWhatsApp = '593992249152'
+  const numeroWhatsApp = '593998480376'
   
   // Abrir WhatsApp en nueva pestaña
   const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${mensaje}`

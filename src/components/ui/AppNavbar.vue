@@ -39,9 +39,7 @@ const handleLogout = async (): Promise<void> => {
   router.push('/')
 }
 
-const irALogin = (): void => {
-  router.push('/login')
-}
+
 
 const irAlDashboard = (): void => {
   if (isAdmin.value) {
@@ -243,7 +241,7 @@ const handleQuickCheckout = (): void => {
   mensaje += 'Espero su confirmación. ¡Gracias!'
   
   // Número de WhatsApp (formato internacional sin +)
-  const numeroWhatsApp = '593992249152'
+  const numeroWhatsApp = '593998480376'
   
   // Abrir WhatsApp en nueva pestaña
   const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${mensaje}`
@@ -427,56 +425,7 @@ const platforms: { id: GamePlatform; label: string; icon: string }[] = [
 
           <!-- Acciones (Usuario y Carrito) -->
           <div class="flex items-center gap-1 sm:gap-2 shrink-0 animate-fadeInUp delay-200">
-            <!-- Botón Usuario -->
-            <div v-if="currentUser" class="dropdown dropdown-end">
-              <div 
-                tabindex="0" 
-                role="button" 
-                class="btn btn-ghost btn-circle hover:bg-primary/20 hover:shadow-glow-primary transition-all duration-300 hover:scale-110 w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 min-h-0"
-                @click="handleUserDropdownToggle"
-              >
-                <User :size="18" class="sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white hover:text-primary transition-colors" />
-              </div>
-              <ul
-                ref="userDropdownRef"
-                tabindex="0"
-                class="mt-3 z-9999 p-2 shadow-lg menu menu-sm dropdown-content glass-effect rounded-lg w-56 sm:w-60 border border-white/10 animate-scaleIn fixed lg:absolute"
-              >
-                <!-- Información del usuario -->
-                <li class="menu-title">
-                  <div class="flex flex-col gap-1 py-2">
-                    <span class="text-xs font-semibold text-base-content/90 break-all">{{ currentUser.email }}</span>
-                    <span v-if="currentUserData" class="text-xs badge badge-sm" :class="isAdmin ? 'badge-error' : hasEmployeeAccess ? 'badge-warning' : 'badge-ghost'">
-                      {{ isAdmin ? 'Administrador' : hasEmployeeAccess ? 'Empleado' : 'Cliente' }}
-                    </span>
-                  </div>
-                </li>
-                
-                <div class="divider my-1"></div>
-                
-                <!-- Opción Dashboard (solo para admin y empleados) -->
-                <li v-if="isAdmin || hasEmployeeAccess">
-                  <a @click="irAlDashboard" class="hover:bg-primary/20 hover:text-primary transition-all gap-3">
-                    <LayoutDashboard :size="18" />
-                    <span>Panel de Control</span>
-                  </a>
-                </li>
-                <div class="divider my-1"></div>
-                
-                <!-- Cerrar sesión -->
-                <li>
-                  <a @click="handleLogout" class="text-error hover:bg-error/20 transition-all gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    <span>Cerrar Sesión</span>
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <button v-else @click="irALogin" class="btn btn-ghost btn-circle hover:bg-primary/20 hover:shadow-glow-primary transition-all duration-300 hover:scale-110 w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 min-h-0">
-              <User :size="18" class="sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white hover:text-primary transition-colors" />
-            </button>
+         
 
             <!-- Botón Carrito con dropdown -->
             <div class="dropdown dropdown-end relative">
