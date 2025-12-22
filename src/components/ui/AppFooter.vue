@@ -6,7 +6,7 @@ import logo from '/Images/logo/logo.png'
 const router = useRouter()
 
 // Número de WhatsApp
-const whatsappNumber = '593992249152'
+const whatsappNumber = '593998480376'
 const whatsappUrl = `https://wa.me/${whatsappNumber}`
 
 // Links de redes sociales
@@ -144,7 +144,7 @@ const scrollToSection = (sectionId: string): void => {
               rel="noopener noreferrer"
               class="text-sm font-bold text-gradient-animated hover:underline cursor-pointer block"
             >
-              WhatsApp: +593 99 224 9152
+              WhatsApp: +593 99 848 0376
             </a>
           </div>
         </div>
