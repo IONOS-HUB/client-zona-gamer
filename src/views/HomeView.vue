@@ -213,7 +213,7 @@ onMounted(async () => {
   try {
     await Promise.all([
       cargarJuegos('PS4 & PS5'),
-      cargarCombos('PS4 & PS5', true) // Forzar refresh para asegurar que se carguen
+      cargarCombos('PS4 & PS5') // Usar cache si está disponible
     ])
     console.log('✅ Juegos y combos cargados en HomeView')
   } catch (error) {
