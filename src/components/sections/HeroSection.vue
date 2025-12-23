@@ -74,34 +74,56 @@ const masonryColumns = computed(() => {
     }
   })
   
-  // Duplicar cada columna para crear efecto de loop infinito
-  // Optimización: solo duplicar 3 veces (suficiente para el loop sin sobrecargar)
+  // Duplicar cada columna muchas veces para crear efecto de loop verdaderamente infinito
+  // Duplicar 6 veces para asegurar que siempre haya contenido suficiente
   return columns.map(column => {
     if (column.length === 0) return []
-    // Duplicar 3 veces: suficiente para el loop infinito sin sobrecargar el DOM
-    return [...column, ...column, ...column]
+    // Duplicar 6 veces para un loop infinito más robusto
+    return [...column, ...column, ...column, ...column, ...column, ...column]
   })
 })
 
 // Estado de pausa para cada columna
 const isPaused = ref(false)
 
-// Carrusel horizontal para móvil
-const carouselIndex = ref(0)
+// Carrusel horizontal para móvil con scroll infinito suave
+const carouselPosition = ref(0)
 const isCarouselPaused = ref(false)
-let carouselInterval: number | null = null
+let carouselAnimationId: number | null = null
 
-// Iniciar carrusel horizontal para móvil
+// Juegos duplicados para loop infinito en móvil
+const infiniteCarouselGames = computed(() => {
+  if (allFeaturedGames.value.length === 0) return []
+  // Duplicar 4 veces para scroll infinito suave
+  return [
+    ...allFeaturedGames.value,
+    ...allFeaturedGames.value,
+    ...allFeaturedGames.value,
+    ...allFeaturedGames.value
+  ]
+})
+
+// Iniciar carrusel horizontal para móvil con scroll continuo
 const startCarousel = () => {
   if (allFeaturedGames.value.length === 0) return
   
-  const carousel = () => {
-    if (isCarouselPaused.value) return
+  const scrollSpeed = 0.3 // píxeles por frame
+  const originalSetWidth = allFeaturedGames.value.length * 100 // Ancho de un set completo en %
+  
+  const animate = () => {
+    if (!isCarouselPaused.value) {
+      carouselPosition.value += scrollSpeed
+      
+      // Loop infinito: cuando llegamos al final de un conjunto, reiniciamos
+      if (carouselPosition.value >= originalSetWidth) {
+        carouselPosition.value = carouselPosition.value - originalSetWidth
+      }
+    }
     
-    carouselIndex.value = (carouselIndex.value + 1) % allFeaturedGames.value.length
+    carouselAnimationId = requestAnimationFrame(animate)
   }
   
-  carouselInterval = window.setInterval(carousel, 3000) // Cambiar cada 3 segundos
+  carouselAnimationId = requestAnimationFrame(animate)
 }
 
 // Pausar carrusel
@@ -116,20 +138,17 @@ const resumeCarousel = () => {
 
 // Detener carrusel
 const stopCarousel = () => {
-  if (carouselInterval) {
-    clearInterval(carouselInterval)
-    carouselInterval = null
+  if (carouselAnimationId) {
+    cancelAnimationFrame(carouselAnimationId)
+    carouselAnimationId = null
   }
 }
 
-// Auto-scroll independiente para cada columna (ascensor) - Optimizado
+// Auto-scroll independiente para cada columna (ascensor) - Scroll infinito mejorado
 const startAutoScroll = () => {
-  const scrollSpeed = 0.5 // píxeles por frame
+  const scrollSpeed = 0.5 // píxeles por frame - velocidad constante
   // Direcciones alternadas: abajo, arriba, abajo (para 3 columnas)
-  const scrollDirections = [1, -1, 1] // Direcciones: abajo, arriba, abajo
-  
-  // Usar requestAnimationFrame para mejor rendimiento
-  let animationFrameId: number | null = null
+  const scrollDirections = [1, -1, 1]
   
   // Esperar un momento para que el DOM esté completamente renderizado
   setTimeout(() => {
@@ -142,36 +161,15 @@ const startAutoScroll = () => {
       
       if (!columnContent) return
       
-      // Calcular altura de UNA copia del contenido original (sin duplicar) - Optimizado
-      const getOriginalHeight = () => {
-        const items = columnContent.querySelectorAll('.masonry-item')
-        if (items.length === 0) return 0
-        
-        // Como duplicamos 3 veces, dividimos el total por 3
-        const itemsPerCopy = Math.floor(items.length / 3)
-        if (itemsPerCopy === 0) return 0
-        
-        let height = 0
-        
-        // Calcular altura solo de los primeros items (más eficiente)
-        for (let i = 0; i < itemsPerCopy; i++) {
-          const item = items[i] as HTMLElement
-          if (item && item.offsetHeight > 0) {
-            height += item.offsetHeight + 12 // 12px es el gap (0.75rem)
-          }
-        }
-        
-        return height
-      }
-      
-      // Esperar a que los items se rendericen - Optimizado con menos reintentos
+      // Esperar a que los items se rendericen
       const initScroll = () => {
-        const maxRetries = 10
+        const maxRetries = 15
         let retries = 0
         
         const checkReady = () => {
           const items = columnContent.querySelectorAll('.masonry-item')
-          if (items.length === 0 || retries >= maxRetries) {
+          
+          if (items.length === 0) {
             if (retries < maxRetries) {
               retries++
               setTimeout(checkReady, 100)
@@ -179,9 +177,9 @@ const startAutoScroll = () => {
             return
           }
           
-          // Verificar que al menos el primer item tenga altura
+          // Verificar que los items tengan altura
           const firstItem = items[0] as HTMLElement
-          if (firstItem && firstItem.offsetHeight === 0) {
+          if (!firstItem || firstItem.offsetHeight === 0) {
             if (retries < maxRetries) {
               retries++
               setTimeout(checkReady, 100)
@@ -189,9 +187,9 @@ const startAutoScroll = () => {
             return
           }
           
-          const originalHeight = getOriginalHeight()
-          
-          if (originalHeight === 0) {
+          // Calcular altura de UN conjunto (dividido por 6 porque duplicamos 6 veces)
+          const itemsPerSet = Math.floor(items.length / 6)
+          if (itemsPerSet === 0) {
             if (retries < maxRetries) {
               retries++
               setTimeout(checkReady, 100)
@@ -199,46 +197,61 @@ const startAutoScroll = () => {
             return
           }
           
-          const containerHeight = column.clientHeight
+          let setHeight = 0
+          for (let i = 0; i < itemsPerSet; i++) {
+            const item = items[i] as HTMLElement
+            if (item && item.offsetHeight > 0) {
+              setHeight += item.offsetHeight + 12 // 12px gap
+            }
+          }
           
-          // Asegurar que el segmento sea al menos tan alto como el contenedor
-          const segmentHeight = Math.max(originalHeight, containerHeight)
+          if (setHeight === 0) {
+            if (retries < maxRetries) {
+              retries++
+              setTimeout(checkReady, 100)
+            }
+            return
+          }
           
-          // Usar requestAnimationFrame en lugar de setInterval para mejor rendimiento
+          console.log(`Columna ${index}: ${itemsPerSet} items, altura del set: ${setHeight}px`)
+          
+          // Función de animación con loop infinito perfecto
           const animate = () => {
-            if (!column || !columnContent || isPaused.value) {
-              animationFrameId = requestAnimationFrame(animate)
-              return
+            // Continuar la animación incluso si está pausado
+            if (!isPaused.value && column && columnContent) {
+              scrollPosition += scrollSpeed * direction
+              
+              // Loop infinito perfecto
+              if (direction > 0) {
+                // Scroll hacia abajo
+                if (scrollPosition >= setHeight) {
+                  scrollPosition = scrollPosition % setHeight
+                }
+              } else {
+                // Scroll hacia arriba
+                if (scrollPosition <= -setHeight) {
+                  scrollPosition = scrollPosition % setHeight
+                }
+              }
+              
+              columnContent.style.transform = `translateY(${scrollPosition}px)`
             }
             
-            scrollPosition += scrollSpeed * direction
-            
-            // Loop infinito: reiniciamos cuando llegamos al final de una copia
-            if (direction > 0) {
-              if (scrollPosition >= segmentHeight) {
-                scrollPosition = scrollPosition - segmentHeight
-              }
-            } else {
-              if (scrollPosition <= -segmentHeight) {
-                scrollPosition = scrollPosition + segmentHeight
-              }
-            }
-            
-            columnContent.style.transform = `translateY(${scrollPosition}px)`
-            animationFrameId = requestAnimationFrame(animate)
+            // Siempre continuar el loop
+            const animId = requestAnimationFrame(animate)
+            scrollIntervals[index] = animId
           }
           
-          animationFrameId = requestAnimationFrame(animate)
-          scrollIntervals[index] = animationFrameId as unknown as number
+          // Iniciar animación
+          animate()
         }
         
-        // Esperar menos tiempo para iniciar más rápido
-        setTimeout(checkReady, 300)
+        setTimeout(checkReady, 500)
       }
       
       initScroll()
     })
-  }, 100)
+  }, 200)
 }
 
 // Pausar scroll al hacer hover
@@ -292,24 +305,17 @@ onMounted(() => {
   
   // Iniciar auto-scroll después de un pequeño delay para que el DOM esté listo
   setTimeout(() => {
-    // Iniciar masonry en tablet y desktop (768px+)
-    if (window.innerWidth >= 768) {
-      startAutoScroll()
-    } else {
-      // En móvil pequeño, iniciar carrusel horizontal
-      startCarousel()
-    }
+    // Iniciar masonry en todas las pantallas (móvil, tablet y desktop)
+    startAutoScroll()
   }, 500)
   
   // Escuchar cambios de tamaño de ventana
   resizeHandler = () => {
-    if (window.innerWidth >= 768) {
-      stopCarousel()
+    // Reiniciar scroll en cambios de tamaño
+    stopAutoScroll()
+    setTimeout(() => {
       startAutoScroll()
-    } else {
-      stopAutoScroll()
-      startCarousel()
-    }
+    }, 100)
   }
   
   window.addEventListener('resize', resizeHandler)
@@ -317,7 +323,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopAutoScroll()
-  stopCarousel()
   if (reorderInterval) {
     clearInterval(reorderInterval)
     reorderInterval = null
@@ -422,13 +427,15 @@ onUnmounted(() => {
           </div>
         </div>
 
-          <!-- Lado Derecho: Masonry (Desktop/Tablet) / Carrusel Horizontal (Móvil) -->
+          <!-- Lado Derecho: Masonry Grid (Todas las pantallas) -->
         <div class="relative h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] xl:h-[700px] animate-fadeInRight mt-8 lg:mt-0 overflow-hidden" v-if="allFeaturedGames.length > 0">
-          <!-- Masonry para Desktop y Tablet (oculto solo en móvil pequeño) -->
+          <!-- Masonry para todas las pantallas -->
           <div 
-            class="hidden md:block masonry-container-wrapper h-full w-full overflow-hidden"
+            class="masonry-container-wrapper h-full w-full overflow-hidden"
             @mouseenter="pauseScroll"
             @mouseleave="resumeScroll"
+            @touchstart="pauseScroll"
+            @touchend="resumeScroll"
           >
             <div class="masonry-container h-full">
             <div 
@@ -481,72 +488,6 @@ onUnmounted(() => {
               </div>
               </div>
             </div>
-            </div>
-          </div>
-
-          <!-- Carrusel Horizontal para Móvil (visible solo en móvil pequeño) -->
-          <div 
-            class="md:hidden carousel-container h-full w-full overflow-hidden relative"
-            @mouseenter="pauseCarousel"
-            @mouseleave="resumeCarousel"
-            @touchstart="pauseCarousel"
-            @touchend="resumeCarousel"
-          >
-            <div class="carousel-wrapper h-full flex items-center">
-              <div 
-                class="carousel-track flex transition-transform duration-500 ease-in-out"
-                :style="{ transform: `translateX(-${carouselIndex * 100}%)` }"
-              >
-                <div
-                  v-for="(game, index) in allFeaturedGames"
-                  :key="game.id"
-                  class="carousel-slide shrink-0 w-full h-full px-4 flex items-center justify-center"
-                >
-                  <div class="relative w-full max-w-[200px] mx-auto group cursor-pointer" @click="handleAddToCart(game)">
-                    <!-- Imagen -->
-                    <div class="relative w-full overflow-hidden rounded-xl shadow-2xl">
-                      <img 
-                        v-if="game?.foto"
-                        :src="game.foto" 
-                        :alt="game.nombre"
-                        class="w-full h-auto object-contain"
-                      />
-                      <!-- Overlay con gradiente -->
-                      <div class="absolute inset-0 bg-linear-gradient(to top, rgba(0,0,0,0.7), transparent)"></div>
-                      
-                      <!-- Badge de oferta -->
-                      <div 
-                        v-if="game?.descuento && game.descuento > 0"
-                        class="absolute top-2 right-2 z-10 bg-error text-white px-2 py-1 rounded-full font-bold text-xs shadow-lg"
-                      >
-                        -{{ game.descuento }}%
-                      </div>
-                      
-                      <!-- Información -->
-                      <div class="absolute bottom-0 left-0 right-0 p-3">
-                        <h3 class="text-sm font-bold text-white mb-1 line-clamp-2">{{ game.nombre }}</h3>
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                          <span class="badge badge-error badge-xs">{{ game.version }}</span>
-                          <span v-if="game?.tipoPromocion && game.tipoPromocion !== 'ninguna'" class="badge badge-warning badge-xs">
-                            {{ game.tipoPromocion }}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Indicadores del carrusel -->
-            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-              <button
-                v-for="(game, index) in allFeaturedGames"
-                :key="game.id"
-                @click="carouselIndex = index"
-                class="w-2 h-2 rounded-full transition-all duration-300"
-                :class="index === carouselIndex ? 'bg-error w-6' : 'bg-base-content/30'"
-              />
             </div>
           </div>
         </div>
@@ -733,31 +674,7 @@ onUnmounted(() => {
   margin-top: -70.71%;
 }
 
-/* Carrusel horizontal para móvil */
-.carousel-container {
-  position: relative;
-}
-
-.carousel-wrapper {
-  height: 100%;
-  overflow: hidden;
-}
-
-.carousel-track {
-  height: 100%;
-  will-change: transform;
-}
-
-.carousel-slide {
-  height: 100%;
-}
-
-/* En móvil pequeño: ocultar masonry, mostrar carrusel */
-@media (max-width: 767px) {
-  .masonry-container-wrapper {
-    display: none;
-  }
-}
+/* Masonry visible en todas las pantallas */
 
 .masonry-column-wrapper {
   height: 100%;
@@ -769,10 +686,9 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  transition: transform 0.1s linear;
+  transition: none; /* Sin transición para scroll continuo más suave */
   will-change: transform;
-  /* El contenido se duplica 6 veces, así que siempre hay suficiente */
-  /* No necesitamos min-height porque el contenido ya es suficiente */
+  /* El contenido se duplica múltiples veces para loop infinito verdadero */
 }
 
 .masonry-item {
@@ -834,6 +750,24 @@ onUnmounted(() => {
     height: 141.42%;
     margin-left: -70.71%;
     margin-top: -70.71%;
+  }
+}
+
+/* Masonry en móvil - 2 columnas más compactas */
+@media (max-width: 767px) {
+  .masonry-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+    padding: 0.3rem;
+    /* Ajustar rotación y tamaño en móvil */
+    width: 141.42%;
+    height: 141.42%;
+    margin-left: -70.71%;
+    margin-top: -70.71%;
+  }
+  
+  .masonry-item {
+    border-radius: 0.375rem;
   }
 }
 

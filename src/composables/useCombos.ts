@@ -25,7 +25,7 @@ const isSyncingCombos = ref(false)
 
 // Constantes para cache
 const CACHE_KEY_PREFIX = 'combos_cache_'
-const CACHE_DURATION = 10 * 60 * 1000 // 10 minutos en milisegundos
+const CACHE_DURATION = 30 * 60 * 1000 // 30 minutos en milisegundos
 
 // Funciones de cache
 const getCacheKey = (plataforma: ComboPlatform): string => {
@@ -51,7 +51,7 @@ const getCachedCombos = (plataforma: ComboPlatform): ComboSummary[] | null => {
     const timestamp = parseInt(cachedTimestamp, 10)
     const now = Date.now()
     
-    // Verificar si el cache ha expirado (más de 10 minutos)
+    // Verificar si el cache ha expirado (más de 30 minutos)
     if (now - timestamp > CACHE_DURATION) {
       // Cache expirado, limpiar
       localStorage.removeItem(cacheKey)
