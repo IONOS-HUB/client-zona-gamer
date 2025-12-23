@@ -366,7 +366,7 @@ onUnmounted(() => {
          
 
           <!-- Título Principal -->
-          <div class="space-y-2 sm:space-y-3 md:space-y-4">
+          <div class="space-y-2 sm:space-y-3 md:space-y-4 pt-32">
             <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black leading-tight">
               <span class="text-white">Tu Tienda</span>
               <br />
