@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGames } from '@/composables/useGames'
 import { useCombos } from '@/composables/useCombos'
+import { useCurrency } from '@/composables/useCurrency'
 import type { GameSummary, GamePlatform } from '@/types/game'
 import type { ComboSummary } from '@/types/combo'
 import { Filter, SlidersHorizontal, ArrowUpDown, X } from 'lucide-vue-next'
@@ -17,6 +18,7 @@ const route = useRoute()
 const router = useRouter()
 const { games, cargarJuegos, isLoadingGames } = useGames()
 const { combos, cargarCombos, isLoadingCombos } = useCombos()
+const { selectedCurrency, formatPrice, getLowestPrice } = useCurrency()
 
 // Filtros
 const selectedTipo = ref<string>('todos')
@@ -26,6 +28,37 @@ const precioMin = ref<number>(0)
 const precioMax = ref<number>(100)
 const searchQuery = ref<string>('')
 const showFilters = ref(false)
+
+// Rangos de precio según la moneda
+const rangoPrecios = computed(() => {
+  if (selectedCurrency.value === 'COP') {
+    return {
+      min: 0,
+      max: 10000000,      // 10 millones de pesos colombianos
+      step: 10000,        // Incrementos de 10,000 para facilidad de uso
+      defaultMax: 10000000
+    }
+  }
+  return {
+    min: 0,
+    max: 100,
+    step: 1,
+    defaultMax: 100
+  }
+})
+
+// Ajustar precioMax cuando cambia la moneda
+watch(selectedCurrency, (newCurrency) => {
+  if (newCurrency === 'COP') {
+    // Cambiar a pesos colombianos
+    precioMin.value = 0
+    precioMax.value = 10000000  // 10 millones
+  } else {
+    // Cambiar a dólares
+    precioMin.value = 0
+    precioMax.value = 100
+  }
+})
 
 // Paginación
 const currentPage = ref(1)
@@ -140,20 +173,18 @@ const itemsFiltrados = computed(() => {
     )
   }
   
-  // Filtrar por precio
+  // Filtrar por precio (según la moneda actual)
   items = items.filter(item => {
     let precio = 0
     if (item.tipo === 'juego' && 'precios' in item) {
-      // Usar el precio más bajo disponible
-      precio = Math.min(
-        item.precios.ps4Principal,
-        item.precios.ps4Secundaria,
-        item.precios.ps5Principal,
-        item.precios.ps5Secundaria
-      )
+      // Usar el precio más bajo según la moneda actual
+      precio = getLowestPrice(item.precios)
     } else if (item.tipo === 'combo') {
       const combo = item as ComboSummary
-      precio = (combo.precio || combo.costo) ?? 0
+      // Si tiene precios diferenciados, usar el más bajo según la moneda
+      precio = combo.precios 
+        ? getLowestPrice(combo.precios)
+        : (combo.precio || combo.costo) ?? 0
     }
     
     // Aplicar descuento si existe
@@ -211,15 +242,14 @@ const itemsPaginados = computed(() => {
 const getPrecioItem = (item: ContentItem): number => {
   let precio = 0
   if (item.tipo === 'juego' && 'precios' in item) {
-    precio = Math.min(
-      item.precios.ps4Principal,
-      item.precios.ps4Secundaria,
-      item.precios.ps5Principal,
-      item.precios.ps5Secundaria
-    )
+    // Usar el precio más bajo según la moneda actual
+    precio = getLowestPrice(item.precios)
   } else if (item.tipo === 'combo') {
     const combo = item as ComboSummary
-    precio = (combo.precio || combo.costo) ?? 0
+    // Si tiene precios diferenciados, usar el más bajo según la moneda
+    precio = combo.precios 
+      ? getLowestPrice(combo.precios)
+      : (combo.precio || combo.costo) ?? 0
   }
   
   // Aplicar descuento si existe
@@ -250,7 +280,7 @@ const limpiarFiltros = () => {
   selectedPlataforma.value = 'PS4 & PS5'
   selectedOrden.value = 'relevancia'
   precioMin.value = 0
-  precioMax.value = 100
+  precioMax.value = rangoPrecios.value.defaultMax
   searchQuery.value = ''
   currentPage.value = 1
 }
@@ -405,25 +435,27 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
             <div class="space-y-4">
               <div>
                 <label class="label">
-                  <span class="label-text-alt">Mínimo: ${{ precioMin }}</span>
+                  <span class="label-text-alt">Mínimo: {{ formatPrice(precioMin) }}</span>
                 </label>
                 <input 
                   v-model.number="precioMin" 
                   type="range" 
-                  min="0" 
-                  max="100" 
+                  :min="rangoPrecios.min" 
+                  :max="rangoPrecios.max" 
+                  :step="rangoPrecios.step"
                   class="range range-error range-sm"
                 />
               </div>
               <div>
                 <label class="label">
-                  <span class="label-text-alt">Máximo: ${{ precioMax }}</span>
+                  <span class="label-text-alt">Máximo: {{ formatPrice(precioMax) }}</span>
                 </label>
                 <input 
                   v-model.number="precioMax" 
                   type="range" 
-                  min="0" 
-                  max="100" 
+                  :min="rangoPrecios.min" 
+                  :max="rangoPrecios.max"
+                  :step="rangoPrecios.step"
                   class="range range-error range-sm"
                 />
               </div>
@@ -443,8 +475,8 @@ watch([selectedTipo, selectedPlataforma, selectedOrden, precioMin, precioMax], (
                 <div v-if="selectedOrden !== 'relevancia'" class="badge badge-success gap-1">
                   {{ selectedOrden }}
                 </div>
-                <div v-if="precioMin > 0 || precioMax < 100" class="badge badge-warning gap-1">
-                  ${{ precioMin }} - ${{ precioMax }}
+                <div v-if="precioMin > rangoPrecios.min || precioMax < rangoPrecios.defaultMax" class="badge badge-warning gap-1">
+                  {{ formatPrice(precioMin) }} - {{ formatPrice(precioMax) }}
                 </div>
               </div>
             </div>
