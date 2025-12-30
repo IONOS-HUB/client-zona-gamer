@@ -269,13 +269,13 @@
             >
               <!-- Card refactorizado: Imagen arriba, Info abajo -->
               <div class="card bg-base-100 shadow-xl hover:shadow-2xl border border-white/10 overflow-hidden group transition-all duration-300 hover:scale-[1.02] flex flex-col max-w-sm mx-auto">
-                <!-- Imagen del combo - ARRIBA (aspect ratio más ancho para reducir altura) -->
-                <div class="relative w-full aspect-3/4 md:aspect-5/6 overflow-hidden bg-base-200">
+                <!-- Imagen del combo - ARRIBA (tamaño fijo: 250px x 300px) -->
+                <div class="relative bg-base-300 overflow-hidden flex items-center justify-center" style="width: 250px; height: 300px; margin: 0 auto;">
                   <img 
                     v-if="combo.foto" 
                     :src="combo.foto" 
                     :alt="combo.nombre"
-                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     loading="lazy"
                   />
                   <div v-else class="w-full h-full flex items-center justify-center bg-linear-to-br from-error/20 via-purple-600/20 to-amber-500/20">
@@ -285,7 +285,7 @@
                   <!-- Badge de descuento (si tiene promoción) -->
                   <div 
                     v-if="combo.tipoPromocion === 'oferta' || combo.tipoPromocion === 'promocion' || combo.isOffert"
-                    class="absolute top-3 right-3 bg-error text-white font-black px-3 py-1.5 rounded-lg shadow-xl text-sm animate-pulse"
+                    class="absolute top-3 right-3 z-20 bg-error text-white font-black px-3 py-1.5 rounded-lg shadow-xl text-sm animate-pulse"
                   >
                     -{{ calcularDescuento(combo) }}% OFF
                   </div>
