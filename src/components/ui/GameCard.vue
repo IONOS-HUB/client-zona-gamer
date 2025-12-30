@@ -39,8 +39,20 @@ const precioConDescuento = computed(() => {
   return precioActual.value
 })
 
+// Verificar si el juego tiene stock disponible
+const tieneStockDisponible = computed(() => {
+  return (props.game.stockAccounts !== undefined && props.game.stockAccounts > 0) || 
+         (props.game.totalCorreos !== undefined && props.game.totalCorreos > 0)
+})
+
 // Determinar qué tipos de cuenta están disponibles según la versión del juego
+// Solo mostrar si hay stock disponible
 const availableAccountTypes = computed<AccountType[]>(() => {
+  // Si no hay stock, no mostrar ningún tipo de cuenta
+  if (!tieneStockDisponible.value) {
+    return []
+  }
+  
   const types: AccountType[] = []
   if (props.game.version === 'PS4' || props.game.version === 'PS4 & PS5') {
     types.push('Principal PS4', 'Secundaria PS4')
@@ -52,9 +64,12 @@ const availableAccountTypes = computed<AccountType[]>(() => {
 })
 
 // Asegurar que el tipo seleccionado esté disponible
-watch(() => props.game.version, () => {
+watch([() => props.game.version, tieneStockDisponible], () => {
   if (availableAccountTypes.value.length > 0 && !availableAccountTypes.value.includes(selectedAccountType.value)) {
     selectedAccountType.value = availableAccountTypes.value[0] || 'Principal PS4'
+  } else if (availableAccountTypes.value.length === 0) {
+    // Si no hay tipos disponibles, resetear a un valor por defecto
+    selectedAccountType.value = 'Principal PS4'
   }
 }, { immediate: true })
 
@@ -159,9 +174,6 @@ const getVersionDescription = (type: AccountType): string => {
         <div class="badge badge-sm bg-primary/20 text-primary border-primary/30 font-semibold">
           {{ game.version }}
         </div>
-        <div v-if="game.totalCorreos" class="text-xs text-base-content/50">
-          {{ game.totalCorreos }} disponibles
-        </div>
       </div>
 
       <!-- Título del juego/combo -->
@@ -190,8 +202,8 @@ const getVersionDescription = (type: AccountType): string => {
         </div>
       </div>
 
-      <!-- Selector de tipo de cuenta - Compacto -->
-      <div v-if="showAddToCart && availableAccountTypes.length > 1" class="space-y-1">
+      <!-- Selector de tipo de cuenta - Compacto (solo si hay stock disponible) -->
+      <div v-if="showAddToCart && tieneStockDisponible && availableAccountTypes.length > 1" class="space-y-1">
         <div class="grid grid-cols-2 gap-1">
           <button
             v-for="type in availableAccountTypes"
@@ -244,9 +256,9 @@ const getVersionDescription = (type: AccountType): string => {
           <span class="font-bold">{{ currentQuantity }} en el carrito</span>
         </div>
 
-        <!-- Botón agregar al carrito -->
+        <!-- Botón agregar al carrito (solo si hay stock disponible) -->
         <button 
-          v-if="showAddToCart"
+          v-if="showAddToCart && tieneStockDisponible"
           @click="handleAddToCart"
           :class="[
             'group relative w-full font-bold text-sm h-12 border-none shadow-lg hover:shadow-2xl transition-all duration-300 rounded-xl overflow-hidden flex items-center justify-center gap-2',
@@ -266,6 +278,14 @@ const getVersionDescription = (type: AccountType): string => {
           <ShoppingCart :size="18" :stroke-width="2.5" class="relative z-10" />
           <span class="relative z-10">{{ isInCart ? 'Agregar otra' : 'Añadir al carrito' }}</span>
         </button>
+        
+        <!-- Mensaje cuando no hay stock disponible -->
+        <div 
+          v-if="showAddToCart && !tieneStockDisponible"
+          class="w-full text-center text-xs text-base-content/60 py-3 px-4 bg-base-200 rounded-lg border border-base-300"
+        >
+          Sin disponibilidad
+        </div>
       </div>
     </div>
   </div>
