@@ -17,6 +17,32 @@ let scrollIntervals: (number | null)[] = []
 let reorderInterval: number | null = null
 const shuffledGames = ref<GameSummary[]>([])
 
+// Estado reactivo para detectar el tamaño de pantalla
+const isMobileScreen = ref(false)
+
+// Función para detectar si estamos en móvil/tablet (vertical) y reiniciar scroll si cambia
+const checkMobileScreen = () => {
+  const wasMobile = isMobileScreen.value
+  // Tablet (hasta 1024px) también usa layout vertical
+  isMobileScreen.value = window.innerWidth <= 1024
+  
+  // Si cambió el tamaño de pantalla, reiniciar el scroll
+  if (wasMobile !== isMobileScreen.value) {
+    stopAutoScroll()
+    // Limpiar referencias para reiniciar correctamente
+    columnRefs.value = []
+    setTimeout(() => {
+      startAutoScroll()
+    }, 200)
+  }
+}
+
+// Inicializar estado de pantalla
+if (typeof window !== 'undefined') {
+  checkMobileScreen()
+  window.addEventListener('resize', checkMobileScreen)
+}
+
 // Obtener juegos limitados para el masonry (optimización: máximo 12 juegos)
 const allFeaturedGames = computed(() => {
   const filtered = props.games.filter(game => game.activo !== false && game.foto)
@@ -54,7 +80,13 @@ const shuffleArray = (array: GameSummary[]): GameSummary[] => {
 // Reordenar juegos periódicamente
 const reorderGames = () => {
   if (allFeaturedGames.value.length > 0) {
+    // Reiniciar scroll antes de reordenar para evitar saltos
+    stopAutoScroll()
     shuffledGames.value = shuffleArray(allFeaturedGames.value)
+    // Reiniciar scroll después de reordenar
+    setTimeout(() => {
+      startAutoScroll()
+    }, 300)
   }
 }
 
@@ -63,23 +95,33 @@ const masonryColumns = computed(() => {
   const games = shuffledGames.value.length > 0 ? shuffledGames.value : allFeaturedGames.value
   if (games.length === 0) return [[], [], []]
   
-  // Dividir en 3 columnas para efecto masonry
-  const columns: GameSummary[][] = [[], [], []]
+  // Usar estado reactivo para dividir en 2 columnas (móvil/tablet) o 3 columnas (desktop)
+  // Tablet (hasta 1024px) también usa 2 columnas verticales
+  const numColumns = isMobileScreen.value ? 2 : 3
+  
+  // Dividir en columnas según el tamaño de pantalla
+  const columns: GameSummary[][] = Array(numColumns).fill(null).map(() => [])
+  
   games.forEach((game, index) => {
     if (game) {
-      const columnIndex = index % 3
+      const columnIndex = index % numColumns
       if (columnIndex >= 0 && columnIndex < columns.length) {
         columns[columnIndex]?.push(game)
       }
     }
   })
   
-  // Duplicar cada columna muchas veces para crear efecto de loop verdaderamente infinito
-  // Duplicar 6 veces para asegurar que siempre haya contenido suficiente
+  // Duplicar cada columna 10 veces para crear efecto de loop verdaderamente infinito
+  // 10 veces es suficiente para scroll infinito perfecto sin cortes visibles
   return columns.map(column => {
     if (column.length === 0) return []
-    // Duplicar 6 veces para un loop infinito más robusto
-    return [...column, ...column, ...column, ...column, ...column, ...column]
+    // Duplicar 10 veces para un loop infinito más robusto y fluido
+    // Esto asegura que nunca se vea el final del contenido
+    const duplicated: GameSummary[] = []
+    for (let i = 0; i < 10; i++) {
+      duplicated.push(...column)
+    }
+    return duplicated
   })
 })
 
@@ -145,10 +187,16 @@ const stopCarousel = () => {
 }
 
 // Auto-scroll independiente para cada columna (ascensor) - Scroll infinito mejorado
+// Funciona tanto en móvil/tablet (vertical, sin rotación) como en desktop (diagonal, con rotación)
 const startAutoScroll = () => {
-  const scrollSpeed = 0.5 // píxeles por frame - velocidad constante
-  // Direcciones alternadas: abajo, arriba, abajo (para 3 columnas)
-  const scrollDirections = [1, -1, 1]
+  // Velocidad más suave para móvil/tablet
+  const isMobile = isMobileScreen.value // Incluye tablet (hasta 1024px)
+  const scrollSpeed = isMobile ? 0.4 : 0.5 // píxeles por frame - velocidad constante
+  // Direcciones alternadas: 
+  // - Móvil/Tablet (vertical): 2 columnas con direcciones [1, -1] (abajo, arriba)
+  // - Desktop (diagonal): 3 columnas con direcciones [1, -1, 1] (abajo, arriba, abajo)
+  const numColumns = isMobile ? 2 : 3
+  const scrollDirections = isMobile ? [1, -1] : [1, -1, 1]
   
   // Esperar un momento para que el DOM esté completamente renderizado
   setTimeout(() => {
@@ -163,7 +211,7 @@ const startAutoScroll = () => {
       
       // Esperar a que los items se rendericen
       const initScroll = () => {
-        const maxRetries = 15
+        const maxRetries = 20
         let retries = 0
         
         const checkReady = () => {
@@ -187,8 +235,8 @@ const startAutoScroll = () => {
             return
           }
           
-          // Calcular altura de UN conjunto (dividido por 6 porque duplicamos 6 veces)
-          const itemsPerSet = Math.floor(items.length / 6)
+          // Calcular altura de UN conjunto (dividido por 10 porque duplicamos 10 veces)
+          const itemsPerSet = Math.floor(items.length / 10)
           if (itemsPerSet === 0) {
             if (retries < maxRetries) {
               retries++
@@ -198,10 +246,45 @@ const startAutoScroll = () => {
           }
           
           let setHeight = 0
+          // Gap ajustado según el tamaño de pantalla
+          // En móvil el masonry es vertical (gap: 0.5rem = 8px), en desktop es diagonal (gap: 0.75rem = 12px)
+          // Obtener el gap real del CSS calculado
+          const computedStyle = window.getComputedStyle(columnContent)
+          const gapValue = computedStyle.gap || computedStyle.rowGap
+          let gap = 0
+          if (gapValue) {
+            // Convertir rem o px a píxeles
+            if (gapValue.includes('rem')) {
+              const remValue = parseFloat(gapValue)
+              gap = remValue * parseFloat(getComputedStyle(document.documentElement).fontSize)
+            } else if (gapValue.includes('px')) {
+              gap = parseFloat(gapValue)
+            } else {
+              // Fallback: usar valores por defecto
+              gap = isMobile ? 8 : 12
+            }
+          } else {
+            // Fallback: usar valores por defecto según el tamaño de pantalla
+            gap = isMobile ? 8 : 12
+          }
+          
           for (let i = 0; i < itemsPerSet; i++) {
             const item = items[i] as HTMLElement
             if (item && item.offsetHeight > 0) {
-              setHeight += item.offsetHeight + 12 // 12px gap
+              setHeight += item.offsetHeight
+              // Solo agregar gap si no es el último item
+              if (i < itemsPerSet - 1) {
+                setHeight += gap
+              }
+            }
+          }
+          
+          // Asegurar que setHeight tenga un valor mínimo válido
+          if (setHeight === 0) {
+            // Si no hay altura calculada, usar una estimación basada en el primer item
+            const firstItem = items[0] as HTMLElement
+            if (firstItem && firstItem.offsetHeight > 0) {
+              setHeight = (firstItem.offsetHeight + gap) * itemsPerSet
             }
           }
           
@@ -213,28 +296,91 @@ const startAutoScroll = () => {
             return
           }
           
-          console.log(`Columna ${index}: ${itemsPerSet} items, altura del set: ${setHeight}px`)
+          // Asegurar que el contenido tenga suficiente altura para evitar cortes
+          const columnHeight = column.offsetHeight
+          const minContentHeight = columnHeight * 5 // Al menos 5 veces la altura visible para móvil
           
-          // Función de animación con loop infinito perfecto
+          // Verificar altura real del contenido
+          const actualContentHeight = columnContent.scrollHeight
+          
+          // Verificar que tenemos suficiente contenido para el loop infinito
+          // Si el contenido es muy corto, necesitamos asegurar que el setHeight sea correcto
+          if (setHeight === 0 || itemsPerSet === 0) {
+            if (retries < maxRetries) {
+              retries++
+              setTimeout(checkReady, 100)
+            }
+            return
+          }
+          
+          
+          // Calcular altura total del contenido duplicado (10 veces)
+          const totalContentHeight = setHeight * 10
+          
+          // Iniciar desde el medio del contenido para permitir scroll en ambas direcciones
+          // Esto asegura que siempre haya contenido visible arriba y abajo
+          // Empezar en el medio de las 10 duplicaciones
+          const initialPosition = setHeight * 5 // Medio del contenido total
+          scrollPosition = initialPosition
+          
+          // Función de animación con loop infinito perfecto y suave
           const animate = () => {
-            // Continuar la animación incluso si está pausado
             if (!isPaused.value && column && columnContent) {
               scrollPosition += scrollSpeed * direction
               
-              // Loop infinito perfecto
+              // Loop infinito perfecto usando módulo con setHeight
+              // Como el contenido está duplicado 10 veces de forma continua,
+              // podemos hacer loop simplemente usando módulo con setHeight
+              // Esto asegura que cuando llegamos al final de un conjunto,
+              // el siguiente conjunto idéntico está justo después visualmente
+              
+              // Normalizar scrollPosition usando módulo para crear loop infinito
+              // El módulo asegura que siempre estemos dentro del rango [0, setHeight)
+              // pero el contenido duplicado permite que visualmente sea infinito
+              
               if (direction > 0) {
-                // Scroll hacia abajo
+                // Scroll hacia abajo (positivo)
+                // Cuando scrollPosition >= setHeight, resetear usando módulo
+                // Esto crea un loop continuo porque el contenido está duplicado
                 if (scrollPosition >= setHeight) {
                   scrollPosition = scrollPosition % setHeight
+                  // Si el módulo da 0, mantener un valor mínimo para evitar saltos
+                  if (scrollPosition === 0 && scrollSpeed > 0) {
+                    scrollPosition = 0.01
+                  }
                 }
               } else {
-                // Scroll hacia arriba
-                if (scrollPosition <= -setHeight) {
+                // Scroll hacia arriba (negativo)
+                // Cuando scrollPosition es negativo, significa que hemos pasado el inicio
+                // Necesitamos saltar al final del conjunto para continuar el loop
+                if (scrollPosition < 0) {
+                  // Calcular cuánto nos pasamos y ajustar al final del conjunto
+                  const overflow = Math.abs(scrollPosition)
+                  scrollPosition = setHeight - (overflow % setHeight)
+                  // Si el módulo da 0, usar un valor cercano al final
+                  if (scrollPosition >= setHeight) {
+                    scrollPosition = setHeight - 0.01
+                  }
+                } else if (scrollPosition >= setHeight) {
+                  // Por si acaso, también manejar el caso cuando es mayor
                   scrollPosition = scrollPosition % setHeight
                 }
               }
               
-              columnContent.style.transform = `translateY(${scrollPosition}px)`
+              // Asegurar que scrollPosition esté siempre en el rango válido
+              // Esto previene espacios vacíos
+              if (scrollPosition < 0) {
+                scrollPosition = setHeight + scrollPosition
+              } else if (scrollPosition >= setHeight) {
+                scrollPosition = scrollPosition % setHeight
+              }
+              
+              // Aplicar transformación - usar negativo para scroll hacia abajo
+              // translateY negativo mueve el contenido hacia arriba, creando scroll hacia abajo
+              // Usar scrollPosition directamente ya que el contenido está duplicado 10 veces
+              // Esto crea la ilusión de scroll infinito
+              const translateY = -scrollPosition
+              columnContent.style.transform = `translateY(${translateY}px)`
             }
             
             // Siempre continuar el loop
@@ -242,8 +388,13 @@ const startAutoScroll = () => {
             scrollIntervals[index] = animId
           }
           
-          // Iniciar animación
-          animate()
+          // Aplicar posición inicial
+          columnContent.style.transform = `translateY(${-initialPosition}px)`
+          
+          // Iniciar animación después de un pequeño delay para asegurar que el DOM esté listo
+          setTimeout(() => {
+            animate()
+          }, 100)
         }
         
         setTimeout(checkReady, 500)
@@ -309,13 +460,22 @@ onMounted(() => {
     startAutoScroll()
   }, 500)
   
-  // Escuchar cambios de tamaño de ventana
+  // Escuchar cambios de tamaño de ventana con debounce
+  let resizeTimeout: number | null = null
   resizeHandler = () => {
-    // Reiniciar scroll en cambios de tamaño
-    stopAutoScroll()
-    setTimeout(() => {
-      startAutoScroll()
-    }, 100)
+    // Debounce para evitar múltiples reinicios
+    if (resizeTimeout) {
+      clearTimeout(resizeTimeout)
+    }
+    resizeTimeout = window.setTimeout(() => {
+      // Reiniciar scroll en cambios de tamaño
+      stopAutoScroll()
+      // Limpiar referencias para reiniciar correctamente
+      columnRefs.value = []
+      setTimeout(() => {
+        startAutoScroll()
+      }, 200)
+    }, 250)
   }
   
   window.addEventListener('resize', resizeHandler)
@@ -330,6 +490,9 @@ onUnmounted(() => {
   if (resizeHandler) {
     window.removeEventListener('resize', resizeHandler)
     resizeHandler = null
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', checkMobileScreen)
   }
 })
 </script>
@@ -428,7 +591,7 @@ onUnmounted(() => {
         </div>
 
           <!-- Lado Derecho: Masonry Grid (Todas las pantallas) -->
-        <div class="relative h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] xl:h-[700px] animate-fadeInRight mt-8 lg:mt-0 overflow-hidden" v-if="allFeaturedGames.length > 0">
+        <div class="relative h-[400px] sm:h-[450px] md:h-[500px] lg:h-[600px] xl:h-[700px] animate-fadeInRight mt-8 lg:mt-0 overflow-hidden" v-if="allFeaturedGames.length > 0">
           <!-- Masonry para todas las pantallas -->
           <div 
             class="masonry-container-wrapper h-full w-full overflow-hidden"
@@ -438,10 +601,14 @@ onUnmounted(() => {
             @touchend="resumeScroll"
           >
             <div class="masonry-container h-full">
+            <template v-for="(column, colIndex) in masonryColumns" :key="`column-${isMobileScreen ? 'mobile' : 'desktop'}-${colIndex}`">
             <div 
-              v-for="(column, colIndex) in masonryColumns" 
-              :key="colIndex"
-              :ref="(el) => { if (el) columnRefs[colIndex] = el as HTMLElement }"
+              v-if="column && column.length > 0"
+              :ref="(el) => { 
+                if (el) {
+                  columnRefs[colIndex] = el as HTMLElement
+                }
+              }"
               class="masonry-column-wrapper"
             >
               <div class="masonry-column-content">
@@ -488,6 +655,7 @@ onUnmounted(() => {
               </div>
               </div>
             </div>
+            </template>
             </div>
           </div>
         </div>
@@ -652,6 +820,8 @@ onUnmounted(() => {
 .masonry-container-wrapper {
   position: relative;
   overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 .masonry-container {
@@ -678,6 +848,7 @@ onUnmounted(() => {
 
 .masonry-column-wrapper {
   height: 100%;
+  width: 100%;
   overflow: hidden;
   position: relative;
 }
@@ -689,6 +860,12 @@ onUnmounted(() => {
   transition: none; /* Sin transición para scroll continuo más suave */
   will-change: transform;
   /* El contenido se duplica múltiples veces para loop infinito verdadero */
+  /* Asegurar que el contenido sea lo suficientemente largo para scroll infinito */
+  /* No usar min-height, dejar que el contenido natural defina la altura */
+  position: relative;
+  /* Asegurar que no haya espacios vacíos */
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .masonry-item {
@@ -740,34 +917,64 @@ onUnmounted(() => {
   background: rgba(239, 68, 68, 0.7);
 }
 
-/* Responsive masonry */
+/* Responsive masonry - Tablet y móvil vertical (sin rotación diagonal) */
 @media (max-width: 1024px) {
   .masonry-container {
     grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
-    /* Ajustar rotación y tamaño en tablet */
-    width: 141.42%;
-    height: 141.42%;
-    margin-left: -70.71%;
-    margin-top: -70.71%;
-  }
-}
-
-/* Masonry en móvil - 2 columnas más compactas */
-@media (max-width: 767px) {
-  .masonry-container {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.4rem;
-    padding: 0.3rem;
-    /* Ajustar rotación y tamaño en móvil */
-    width: 141.42%;
-    height: 141.42%;
-    margin-left: -70.71%;
-    margin-top: -70.71%;
+    padding: 0.5rem;
+    /* Eliminar rotación diagonal en tablet/móvil - layout vertical normal */
+    transform: none;
+    transform-origin: initial;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    left: auto;
+    top: auto;
+    margin-left: 0;
+    margin-top: 0;
   }
   
   .masonry-item {
-    border-radius: 0.375rem;
+    /* Eliminar rotación de los items en tablet/móvil - mantener vertical */
+    transform: none;
+    transform-origin: initial;
+    border-radius: 0.5rem;
+  }
+  
+  .masonry-item:hover {
+    /* Hover sin rotación en tablet/móvil */
+    transform: translateY(-4px) scale(1.05);
+  }
+  
+  .masonry-column-content {
+    gap: 0.5rem; /* Gap normal en tablet/móvil para mejor scroll infinito */
+  }
+  
+  /* Asegurar scroll infinito suave en tablet/móvil */
+  .masonry-column-wrapper {
+    overflow: hidden;
+    -webkit-overflow-scrolling: touch;
+    /* Asegurar que ocupe todo el espacio disponible */
+    height: 100%;
+    width: 100%;
+  }
+  
+  /* Asegurar que el contenedor principal ocupe todo el espacio */
+  .masonry-container-wrapper {
+    height: 100%;
+    width: 100%;
+  }
+}
+
+/* Masonry en móvil - Ajustes adicionales solo para móvil pequeño */
+@media (max-width: 767px) {
+  .masonry-column-content {
+    gap: 0.4rem; /* Gap más pequeño en móvil para mejor scroll infinito */
+  }
+  
+  .masonry-item {
+    border-radius: 0.375rem; /* Border radius más pequeño en móvil */
   }
 }
 

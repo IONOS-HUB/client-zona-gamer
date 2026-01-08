@@ -174,7 +174,7 @@ const getVersionDescription = (type: AccountType): string => {
       <!-- Badge de descuento - Esquina superior izquierda -->
       <div 
         v-if="game.descuento && game.descuento > 0" 
-        class="absolute top-3 left-3 z-20 bg-gradient-to-r from-orange-500 to-red-600 text-white font-black px-3 py-1.5 rounded-lg shadow-xl text-sm"
+        class="absolute top-2 left-2 sm:top-3 sm:left-3 z-20 bg-gradient-to-r from-orange-500 to-red-600 text-white font-black px-2 py-1 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg shadow-xl text-xs sm:text-sm"
       >
         -{{ game.descuento }}%
       </div>
@@ -182,13 +182,13 @@ const getVersionDescription = (type: AccountType): string => {
       <!-- Badge de tipo de promoción - Esquina superior derecha -->
       <div 
         v-if="game.tipoPromocion === 'oferta' || game.isOffert"
-        class="absolute top-3 right-3 z-20 bg-red-600 text-white font-bold px-3 py-1 rounded-lg shadow-xl text-xs uppercase tracking-wider"
+        class="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 bg-red-600 text-white font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-lg shadow-xl text-[10px] sm:text-xs uppercase tracking-wider"
       >
         Oferta
       </div>
       <div 
         v-else-if="game.tipoPromocion === 'promocion'"
-        class="absolute top-3 right-3 z-20 bg-yellow-500 text-black font-bold px-3 py-1 rounded-lg shadow-xl text-xs uppercase tracking-wider"
+        class="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 bg-yellow-500 text-black font-bold px-2 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-lg shadow-xl text-[10px] sm:text-xs uppercase tracking-wider"
       >
         Promo
       </div>
@@ -198,30 +198,30 @@ const getVersionDescription = (type: AccountType): string => {
     </div>
 
     <!-- Contenido de la card -->
-    <div class="card-body p-4 space-y-3 flex-grow flex flex-col">
+    <div class="card-body p-3 sm:p-4 space-y-2 sm:space-y-3 flex-grow flex flex-col">
 
 
       <!-- Título del juego/combo -->
-      <h3 class="text-base font-bold text-white leading-tight line-clamp-2 min-h-[2.5rem] flex-grow">
+      <h3 class="text-sm sm:text-base font-bold text-white leading-tight line-clamp-2 min-h-[2.25rem] sm:min-h-[2.5rem] flex-grow">
         {{ game.nombre }}
       </h3>
 
       <!-- Información de juegos del combo -->
-      <div v-if="isCombo" class="bg-base-300 rounded-lg p-2.5 space-y-2">
-        <h4 class="font-bold text-xs flex items-center gap-2 text-base-content/90">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div v-if="isCombo" class="bg-base-300 rounded-lg p-2 sm:p-2.5 space-y-1.5 sm:space-y-2">
+        <h4 class="font-bold text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 text-base-content/90">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-error shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
           <span>{{ props.comboGames!.length }} Juego{{ props.comboGames!.length !== 1 ? 's' : '' }} Incluido{{ props.comboGames!.length !== 1 ? 's' : '' }}</span>
         </h4>
         
-        <div class="space-y-1.5 max-h-[100px] overflow-y-auto custom-scrollbar-combo pr-1">
+        <div class="space-y-1 sm:space-y-1.5 max-h-[80px] sm:max-h-[100px] overflow-y-auto custom-scrollbar-combo pr-1">
           <div
             v-for="(juego, index) in props.comboGames"
             :key="index"
-            class="flex items-center gap-2 text-xs bg-base-200 px-2.5 py-1.5 rounded-md"
+            class="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs bg-base-200 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md"
           >
-            <div class="shrink-0 w-1.5 h-1.5 rounded-full bg-error"></div>
+            <div class="shrink-0 w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-error"></div>
             <span class="flex-1 line-clamp-1 font-medium text-base-content/90">{{ juego.nombre }}</span>
           </div>
         </div>
@@ -236,12 +236,12 @@ const getVersionDescription = (type: AccountType): string => {
             @click="selectedAccountType = type"
             :disabled="!tieneStockDisponible || availableAccountTypes.length === 0 || !availableAccountTypes.includes(type)"
             :class="[
-              'w-full px-3 py-2 rounded-md text-sm font-bold transition-all duration-200 border text-left',
+              'w-full px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md text-xs sm:text-sm font-bold transition-all duration-200 border text-left touch-manipulation',
               !tieneStockDisponible || availableAccountTypes.length === 0 || !availableAccountTypes.includes(type)
                 ? 'bg-base-300 text-base-content/40 border-base-300 cursor-not-allowed opacity-60'
                 : selectedAccountType === type 
-                  ? 'bg-primary text-white border-primary shadow-md scale-[1.02]' 
-                  : 'bg-base-200 text-base-content/60 border-base-300 hover:bg-base-300 hover:border-primary/30'
+                  ? 'bg-primary text-white border-primary shadow-md scale-[1.02] active:scale-[0.98]' 
+                  : 'bg-base-200 text-base-content/60 border-base-300 hover:bg-base-300 hover:border-primary/30 active:scale-[0.98]'
             ]"
             :title="!tieneStockDisponible || availableAccountTypes.length === 0 || !availableAccountTypes.includes(type) ? `${getVersionDescription(type)} - Sin disponibilidad` : getVersionDescription(type)"
           >
@@ -251,17 +251,17 @@ const getVersionDescription = (type: AccountType): string => {
       </div>
 
       <!-- Precio y botón -->
-      <div class="space-y-3 pt-2 border-t border-white/10">
+      <div class="space-y-2 sm:space-y-3 pt-2 border-t border-white/10">
         <!-- Precio -->
         <div class="flex flex-col">
-          <span class="text-xs text-base-content/50 mb-1">Desde</span>
-          <div class="flex items-baseline gap-2">
-            <span class="text-2xl font-black text-white">
+          <span class="text-[10px] sm:text-xs text-base-content/50 mb-0.5 sm:mb-1">Desde</span>
+          <div class="flex items-baseline gap-1.5 sm:gap-2">
+            <span class="text-xl sm:text-2xl font-black text-white">
               {{ formatearPrecio(precioConDescuento) }}
             </span>
             <span 
               v-if="game.descuento && game.descuento > 0" 
-              class="text-sm text-base-content/40 line-through"
+              class="text-xs sm:text-sm text-base-content/40 line-through"
             >
               {{ formatearPrecio(precioActual) }}
             </span>
@@ -269,7 +269,7 @@ const getVersionDescription = (type: AccountType): string => {
           <!-- Indicador de cashback o descuento -->
           <div 
             v-if="game.descuento && game.descuento > 0" 
-            class="text-xs text-success font-semibold mt-1"
+            class="text-[10px] sm:text-xs text-success font-semibold mt-0.5 sm:mt-1"
           >
             {{ game.descuento }}% de descuento
           </div>
@@ -278,9 +278,9 @@ const getVersionDescription = (type: AccountType): string => {
         <!-- Indicador de carrito (si está en el carrito) -->
         <div 
           v-if="isInCart" 
-          class="flex items-center gap-2 text-xs bg-success/10 text-success px-3 py-2 rounded-lg border border-success/30"
+          class="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs bg-success/10 text-success px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md sm:rounded-lg border border-success/30"
         >
-          <Check :size="14" :stroke-width="3" />
+          <Check :size="12" class="sm:w-3.5 sm:h-3.5" :stroke-width="3" />
           <span class="font-bold">{{ currentQuantity }} en el carrito</span>
         </div>
 
@@ -289,10 +289,10 @@ const getVersionDescription = (type: AccountType): string => {
           v-if="showAddToCart && tieneStockDisponible && availableAccountTypes.length > 0"
           @click="handleAddToCart"
           :class="[
-            'group relative w-full font-bold text-sm h-12 border-none shadow-lg hover:shadow-2xl transition-all duration-300 rounded-xl overflow-hidden flex items-center justify-center gap-2',
+            'group relative w-full font-bold text-xs sm:text-sm h-10 sm:h-12 border-none shadow-lg hover:shadow-2xl transition-all duration-300 rounded-lg sm:rounded-xl overflow-hidden flex items-center justify-center gap-1.5 sm:gap-2 touch-manipulation',
             isInCart 
-              ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white hover:scale-[1.02]' 
-              : 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black hover:scale-[1.02]'
+              ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white hover:scale-[1.02] active:scale-[0.98]' 
+              : 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black hover:scale-[1.02] active:scale-[0.98]'
           ]"
         >
           <!-- Efecto de brillo -->
@@ -303,14 +303,14 @@ const getVersionDescription = (type: AccountType): string => {
             ]"
           ></div>
           
-          <ShoppingCart :size="18" :stroke-width="2.5" class="relative z-10" />
+          <ShoppingCart :size="16" :stroke-width="2.5" class="relative z-10 sm:w-[18px] sm:h-[18px]" />
           <span class="relative z-10">{{ isInCart ? 'Agregar otra' : 'Añadir al carrito' }}</span>
         </button>
         
         <!-- Mensaje cuando no hay stock disponible o no hay tipos de cuenta disponibles -->
         <div 
           v-if="showAddToCart && (!tieneStockDisponible || availableAccountTypes.length === 0)"
-          class="w-full text-center text-xs text-base-content/60 py-3 px-4 bg-base-200 rounded-lg border border-base-300"
+          class="w-full text-center text-[10px] sm:text-xs text-base-content/60 py-2 sm:py-3 px-3 sm:px-4 bg-base-200 rounded-md sm:rounded-lg border border-base-300"
         >
           Sin disponibilidad
         </div>
