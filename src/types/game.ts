@@ -59,6 +59,7 @@ export interface GameSummary {
   totalCorreos: number
   correos: string[] // Lista de correos asociados
   stockAccounts?: number // Número de cuentas marcadas como stock
+  stockByAccountType?: Record<AccountType, number> // Número de slots disponibles por tipo de cuenta
   descuento?: number // Porcentaje de descuento (0-100)
   precioOriginal?: number // Precio antes del descuento (legacy)
   rating?: number // Calificación (0-5)

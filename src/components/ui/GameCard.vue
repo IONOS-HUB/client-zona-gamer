@@ -46,25 +46,50 @@ const tieneStockDisponible = computed(() => {
 })
 
 // Determinar qué tipos de cuenta están disponibles según la versión del juego
-// Solo mostrar si hay stock disponible
+// Solo mostrar si hay stock disponible y tiene slots > 0 para ese tipo específico
 const availableAccountTypes = computed<AccountType[]>(() => {
   // Si no hay stock, no mostrar ningún tipo de cuenta
   if (!tieneStockDisponible.value) {
     return []
   }
   
+  const stockByType = props.game.stockByAccountType
+  if (!stockByType) {
+    // Fallback: si no hay información de slots por tipo, mostrar todos según versión
+    const types: AccountType[] = []
+    if (props.game.version === 'PS4' || props.game.version === 'PS4 & PS5') {
+      types.push('Principal PS4', 'Secundaria PS4')
+    }
+    if (props.game.version === 'PS5' || props.game.version === 'PS4 & PS5') {
+      types.push('Principal PS5', 'Secundaria PS5')
+    }
+    return types.length > 0 ? types : ['Principal PS4', 'Secundaria PS4', 'Principal PS5', 'Secundaria PS5']
+  }
+  
+  // Filtrar solo los tipos de cuenta que tienen slots disponibles (> 0)
   const types: AccountType[] = []
   if (props.game.version === 'PS4' || props.game.version === 'PS4 & PS5') {
-    types.push('Principal PS4', 'Secundaria PS4')
+    if (stockByType['Principal PS4'] > 0) {
+      types.push('Principal PS4')
+    }
+    if (stockByType['Secundaria PS4'] > 0) {
+      types.push('Secundaria PS4')
+    }
   }
   if (props.game.version === 'PS5' || props.game.version === 'PS4 & PS5') {
-    types.push('Principal PS5', 'Secundaria PS5')
+    if (stockByType['Principal PS5'] > 0) {
+      types.push('Principal PS5')
+    }
+    if (stockByType['Secundaria PS5'] > 0) {
+      types.push('Secundaria PS5')
+    }
   }
-  return types.length > 0 ? types : ['Principal PS4', 'Secundaria PS4', 'Principal PS5', 'Secundaria PS5']
+  
+  return types
 })
 
 // Asegurar que el tipo seleccionado esté disponible
-watch([() => props.game.version, tieneStockDisponible], () => {
+watch([() => props.game.version, tieneStockDisponible, () => props.game.stockByAccountType, availableAccountTypes], () => {
   if (availableAccountTypes.value.length > 0 && !availableAccountTypes.value.includes(selectedAccountType.value)) {
     selectedAccountType.value = availableAccountTypes.value[0] || 'Principal PS4'
   } else if (availableAccountTypes.value.length === 0) {
@@ -86,13 +111,13 @@ const handleAddToCart = (): void => {
   }
 }
 
-// Obtener versión corta para los botones
+// Obtener texto completo para los botones
 const getVersionLabel = (type: AccountType): string => {
   const labels: Record<AccountType, string> = {
-    'Principal PS4': '1° PS4',
-    'Secundaria PS4': '2° PS4',
-    'Principal PS5': '1° PS5',
-    'Secundaria PS5': '2° PS5'
+    'Principal PS4': 'Principal PS4',
+    'Secundaria PS4': 'Secundaria PS4',
+    'Principal PS5': 'Principal PS5',
+    'Secundaria PS5': 'Secundaria PS5'
   }
   return labels[type]
 }
@@ -169,12 +194,7 @@ const getVersionDescription = (type: AccountType): string => {
 
     <!-- Contenido de la card -->
     <div class="card-body p-4 space-y-3 flex-grow flex flex-col">
-      <!-- Plataforma -->
-      <div class="flex items-center gap-2">
-        <div class="badge badge-sm bg-primary/20 text-primary border-primary/30 font-semibold">
-          {{ game.version }}
-        </div>
-      </div>
+
 
       <!-- Título del juego/combo -->
       <h3 class="text-base font-bold text-white leading-tight line-clamp-2 min-h-[2.5rem] flex-grow">
@@ -202,17 +222,17 @@ const getVersionDescription = (type: AccountType): string => {
         </div>
       </div>
 
-      <!-- Selector de tipo de cuenta - Compacto (solo si hay stock disponible) -->
+      <!-- Selector de tipo de cuenta - Una columna (solo si hay stock disponible) -->
       <div v-if="showAddToCart && tieneStockDisponible && availableAccountTypes.length > 1" class="space-y-1">
-        <div class="grid grid-cols-2 gap-1">
+        <div class="flex flex-col gap-1">
           <button
             v-for="type in availableAccountTypes"
             :key="type"
             @click="selectedAccountType = type"
             :class="[
-              'px-2 py-1.5 rounded-md text-xs font-bold transition-all duration-200 border',
+              'w-full px-3 py-2 rounded-md text-sm font-bold transition-all duration-200 border text-left',
               selectedAccountType === type 
-                ? 'bg-primary text-white border-primary shadow-md scale-105' 
+                ? 'bg-primary text-white border-primary shadow-md scale-[1.02]' 
                 : 'bg-base-200 text-base-content/60 border-base-300 hover:bg-base-300 hover:border-primary/30'
             ]"
             :title="getVersionDescription(type)"
@@ -256,9 +276,9 @@ const getVersionDescription = (type: AccountType): string => {
           <span class="font-bold">{{ currentQuantity }} en el carrito</span>
         </div>
 
-        <!-- Botón agregar al carrito (solo si hay stock disponible) -->
+        <!-- Botón agregar al carrito (solo si hay stock disponible y al menos un tipo de cuenta disponible) -->
         <button 
-          v-if="showAddToCart && tieneStockDisponible"
+          v-if="showAddToCart && tieneStockDisponible && availableAccountTypes.length > 0"
           @click="handleAddToCart"
           :class="[
             'group relative w-full font-bold text-sm h-12 border-none shadow-lg hover:shadow-2xl transition-all duration-300 rounded-xl overflow-hidden flex items-center justify-center gap-2',
@@ -279,9 +299,9 @@ const getVersionDescription = (type: AccountType): string => {
           <span class="relative z-10">{{ isInCart ? 'Agregar otra' : 'Añadir al carrito' }}</span>
         </button>
         
-        <!-- Mensaje cuando no hay stock disponible -->
+        <!-- Mensaje cuando no hay stock disponible o no hay tipos de cuenta disponibles -->
         <div 
-          v-if="showAddToCart && !tieneStockDisponible"
+          v-if="showAddToCart && (!tieneStockDisponible || availableAccountTypes.length === 0)"
           class="w-full text-center text-xs text-base-content/60 py-3 px-4 bg-base-200 rounded-lg border border-base-300"
         >
           Sin disponibilidad

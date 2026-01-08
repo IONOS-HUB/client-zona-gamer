@@ -12,7 +12,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import type { GameEmailAccount, GameSummary, GamePlatform, AccountOwner, TelefonoSearchResult, CorreoSearchResult } from '@/types/game'
+import type { GameEmailAccount, GameSummary, GamePlatform, AccountOwner, TelefonoSearchResult, CorreoSearchResult, AccountType } from '@/types/game'
 
 const games = ref<GameSummary[]>([])
 const gameEmails = ref<GameEmailAccount[]>([])
@@ -122,6 +122,13 @@ export function useGames() {
       let correos: string[] = []
       let juegoData: any = null
       let stockCount = 0
+      // Contar slots disponibles por tipo de cuenta
+      const stockByAccountType: Record<AccountType, number> = {
+        'Principal PS4': 0,
+        'Secundaria PS4': 0,
+        'Principal PS5': 0,
+        'Secundaria PS5': 0
+      }
 
       try {
         const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
@@ -135,8 +142,12 @@ export function useGames() {
           }
           if (Array.isArray(data.cuentas)) {
             data.cuentas.forEach((cuenta: AccountOwner) => {
-              if (cuenta?.hasStock) {
+              if (cuenta?.hasStock && cuenta?.tipo) {
                 stockCount++
+                // Contar por tipo de cuenta
+                if (stockByAccountType[cuenta.tipo] !== undefined) {
+                  stockByAccountType[cuenta.tipo]++
+                }
               }
             })
           }
@@ -188,7 +199,8 @@ export function useGames() {
         tipoPromocion, // Nuevo campo de tipo de promoción
         totalCorreos: correos.length,
         correos,
-        stockAccounts: stockCount
+        stockAccounts: stockCount,
+        stockByAccountType // Slots disponibles por tipo de cuenta
       })
       }
 
@@ -773,6 +785,12 @@ export function useGames() {
                   totalCorreos: 0,
                   correos: [],
                   stockAccounts: 0,
+                  stockByAccountType: {
+                    'Principal PS4': 0,
+                    'Secundaria PS4': 0,
+                    'Principal PS5': 0,
+                    'Secundaria PS5': 0
+                  },
                   precios: {
                     ps4Principal: 0,
                     ps4Secundaria: 0,
@@ -889,6 +907,12 @@ export function useGames() {
               totalCorreos: 0,
               correos: [],
               stockAccounts: 0,
+              stockByAccountType: {
+                'Principal PS4': 0,
+                'Secundaria PS4': 0,
+                'Principal PS5': 0,
+                'Secundaria PS5': 0
+              },
               precios: {
                 ps4Principal: 0,
                 ps4Secundaria: 0,
