@@ -199,7 +199,7 @@ watch(() => props.mostrar, (nuevoValor) => {
                 <input
                   v-model="clienteTelefono"
                   type="text"
-                  placeholder="Ej: +593 99 123 4567"
+                  placeholder="Ej: +593 99 123 4567 o +1 234 567 8900"
                   class="input input-bordered focus:input-primary transition-all"
                 />
               </div>

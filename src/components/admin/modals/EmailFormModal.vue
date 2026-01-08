@@ -183,10 +183,15 @@ const parsearArchivoTxt = (contenido: string): void => {
         }
         
         const esStock = /stock/i.test(linea)
-        const telefonoMatch = linea.match(/\+593\s*\d+\s*\d+\s*\d+\s*\d+/)
-        const telefono = telefonoMatch ? telefonoMatch[0].replace(/\s+/g, ' ') : ''
+        // Reconocer cualquier código de país internacional (formato +XXX seguido de números)
+        // Acepta formatos como: +593 99 123 4567, +1 234 567 8900, +52 55 1234 5678, +34 612 345 678, etc.
+        // Busca números que comienzan con + seguido de código de país (1-4 dígitos) y número local
+        const telefonoMatch = linea.match(/\+[1-9]\d{0,3}[\s\-]?\d{1,4}[\s\-]?\d{1,4}[\s\-]?\d{1,4}[\s\-]?\d{0,4}/)
+        const telefono = telefonoMatch ? telefonoMatch[0].replace(/\s+/g, ' ').trim() : ''
         
-        const nombreMatch = linea.match(/la tiene\s+(.+?)\s+\+593/)
+        // Extraer nombre después de "la tiene" y antes de cualquier número telefónico internacional
+        // Busca cualquier código de país (+ seguido de 1-4 dígitos que no empiece con 0)
+        const nombreMatch = linea.match(/la tiene\s+(.+?)\s+\+[1-9]\d{0,3}/)
         let nombre = nombreMatch && nombreMatch[1] ? nombreMatch[1].trim() : ''
         
         if (!nombre && esStock) {

@@ -75,7 +75,7 @@ const formatearFecha = (fecha: Date | string): string => {
               <input
                 v-model="telefonoBusqueda"
                 type="text"
-                placeholder="Ej: +593 99 358 6097 o 993586097"
+                placeholder="Ej: +593 99 358 6097, +1 234 567 8900 o 993586097"
                 class="input input-bordered w-full pl-10"
                 @keyup.enter="buscarTelefono"
                 autocomplete="off"
