@@ -1,25 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useGames } from '@/composables/useGames'
 import { useCombos } from '@/composables/useCombos'
 import { useCartStore } from '@/stores/cart'
 import { generarStructuredData, eliminarStructuredData } from '@/composables/useSEO'
 import type { GamePlatform } from '@/types/game'
+
+// Componentes críticos (carga inmediata)
 import AppNavbar from '@/components/ui/AppNavbar.vue'
 import CartModal from '@/components/ui/CartModal.vue'
 import HeroSection from '@/components/sections/HeroSection.vue'
-import OffersSection from '@/components/sections/OffersSection.vue'
-import PromotionsSection from '@/components/sections/PromotionsSection.vue'
-import TrendingGamesSection from '@/components/sections/TrendingGamesSection.vue'
-import SearchResultsSection from '@/components/sections/SearchResultsSection.vue'
-import AllGamesSection from '@/components/sections/AllGamesSection.vue'
-import PlatformGamesSection from '@/components/sections/PlatformGamesSection.vue'
-import ComboSection from '@/components/sections/ComboSection.vue'
-import FeaturesBanner from '@/components/sections/FeaturesBanner.vue'
-import ReviewsSection from '@/components/sections/ReviewsSection.vue'
-import FAQSection from '@/components/sections/FAQSection.vue'
-import ContactLocationSection from '@/components/sections/ContactLocationSection.vue'
-import AppFooter from '@/components/ui/AppFooter.vue'
+
+// Componentes con lazy loading (carga diferida para mejorar rendimiento)
+const OffersSection = defineAsyncComponent(() => import('@/components/sections/OffersSection.vue'))
+const PromotionsSection = defineAsyncComponent(() => import('@/components/sections/PromotionsSection.vue'))
+const TrendingGamesSection = defineAsyncComponent(() => import('@/components/sections/TrendingGamesSection.vue'))
+const SearchResultsSection = defineAsyncComponent(() => import('@/components/sections/SearchResultsSection.vue'))
+const AllGamesSection = defineAsyncComponent(() => import('@/components/sections/AllGamesSection.vue'))
+const PlatformGamesSection = defineAsyncComponent(() => import('@/components/sections/PlatformGamesSection.vue'))
+const ComboSection = defineAsyncComponent(() => import('@/components/sections/ComboSection.vue'))
+const FeaturesBanner = defineAsyncComponent(() => import('@/components/sections/FeaturesBanner.vue'))
+
+// Componentes del final de página (lazy loading con carga bajo demanda)
+const ReviewsSection = defineAsyncComponent(() => import('@/components/sections/ReviewsSection.vue'))
+const FAQSection = defineAsyncComponent(() => import('@/components/sections/FAQSection.vue'))
+const ContactLocationSection = defineAsyncComponent(() => import('@/components/sections/ContactLocationSection.vue'))
+const AppFooter = defineAsyncComponent(() => import('@/components/ui/AppFooter.vue'))
 
 const { games, isLoadingGames, cargarJuegos } = useGames()
 const { combos, isLoadingCombos, cargarCombos } = useCombos()
@@ -209,28 +215,48 @@ watch(searchTerm, () => {
 })
 
 onMounted(async () => {
-  // Siempre cargar desde PS4 & PS5
+  // Cargar datos de forma optimizada: primero juegos (críticos), luego combos (menos críticos)
   try {
-    await Promise.all([
-      cargarJuegos('PS4 & PS5'),
-      cargarCombos('PS4 & PS5') // Usar cache si está disponible
-    ])
+    // Cargar juegos primero (crítico para el render inicial)
+    // El cache se carga sincrónamente si está disponible, mejorando el tiempo inicial
+    cargarJuegos('PS4 & PS5').catch(error => {
+      console.error('❌ Error cargando juegos:', error)
+    })
+    
+    // Cargar combos después (no crítico, no bloquea el render)
+    // Usar requestIdleCallback si está disponible, sino setTimeout
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        cargarCombos('PS4 & PS5').catch(error => {
+          console.error('❌ Error cargando combos:', error)
+        })
+      }, { timeout: 2000 })
+    } else {
+      setTimeout(() => {
+        cargarCombos('PS4 & PS5').catch(error => {
+          console.error('❌ Error cargando combos:', error)
+        })
+      }, 200)
+    }
+    
     console.log('✅ Juegos y combos cargados en HomeView')
   } catch (error) {
-    console.error('❌ Error cargando juegos/combos en HomeView:', error)
+    console.error('❌ Error cargando datos en HomeView:', error)
   }
   
-  // Agregar structured data para la página de inicio
-  generarStructuredData('BreadcrumbList', {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [{
-      "@type": "ListItem",
-      "position": 1,
-      "name": "Inicio",
-      "item": "https://zonagamer.com/"
-    }]
-  })
+  // Agregar structured data para la página de inicio (no bloquea)
+  setTimeout(() => {
+    generarStructuredData('BreadcrumbList', {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Inicio",
+        "item": "https://zonagamer.com/"
+      }]
+    })
+  }, 0)
 })
 
 onBeforeUnmount(() => {
@@ -321,16 +347,24 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- Resultados de búsqueda (solo cuando hay búsqueda) -->
-        <SearchResultsSection 
-          v-if="searchTerm"
-          :games="juegosFiltrados"
-          :current-page="currentPageSearch"
-          :items-per-page="itemsPerPage"
-          @page-change="handleSearchPageChange"
-          @next="handleSearchNext"
-          @prev="handleSearchPrev"
-        />
+        <!-- Resultados de búsqueda (solo cuando hay búsqueda) - Lazy loaded -->
+        <Suspense v-if="searchTerm">
+          <template #default>
+            <SearchResultsSection 
+              :games="juegosFiltrados"
+              :current-page="currentPageSearch"
+              :items-per-page="itemsPerPage"
+              @page-change="handleSearchPageChange"
+              @next="handleSearchNext"
+              @prev="handleSearchPrev"
+            />
+          </template>
+          <template #fallback>
+            <div class="flex justify-center items-center py-20">
+              <span class="loading loading-spinner loading-lg text-primary"></span>
+            </div>
+          </template>
+        </Suspense>
 
         <!-- Secciones adicionales (solo sin búsqueda) -->
         <template v-if="!searchTerm">
@@ -434,18 +468,54 @@ onBeforeUnmount(() => {
         </template>
       </div>
 
-      <!-- Sección de Reseñas -->
-      <ReviewsSection />
+      <!-- Sección de Reseñas - Lazy loaded -->
+      <Suspense>
+        <template #default>
+          <ReviewsSection />
+        </template>
+        <template #fallback>
+          <div class="flex justify-center items-center py-12">
+            <span class="loading loading-spinner loading-md text-primary"></span>
+          </div>
+        </template>
+      </Suspense>
 
-      <!-- Preguntas Frecuentes -->
-      <FAQSection />
+      <!-- Preguntas Frecuentes - Lazy loaded -->
+      <Suspense>
+        <template #default>
+          <FAQSection />
+        </template>
+        <template #fallback>
+          <div class="flex justify-center items-center py-12">
+            <span class="loading loading-spinner loading-md text-primary"></span>
+          </div>
+        </template>
+      </Suspense>
 
-      <!-- Contacto y Ubicación -->
-      <ContactLocationSection />
+      <!-- Contacto y Ubicación - Lazy loaded -->
+      <Suspense>
+        <template #default>
+          <ContactLocationSection />
+        </template>
+        <template #fallback>
+          <div class="flex justify-center items-center py-12">
+            <span class="loading loading-spinner loading-md text-primary"></span>
+          </div>
+        </template>
+      </Suspense>
 
-      <!-- Footer -->
+      <!-- Footer - Lazy loaded -->
       <div class="relative z-50">
-        <AppFooter />
+        <Suspense>
+          <template #default>
+            <AppFooter />
+          </template>
+          <template #fallback>
+            <div class="flex justify-center items-center py-8">
+              <span class="loading loading-spinner loading-sm text-base-content/40"></span>
+            </div>
+          </template>
+        </Suspense>
       </div>
     </template>
 
