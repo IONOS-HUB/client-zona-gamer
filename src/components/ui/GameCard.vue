@@ -45,6 +45,18 @@ const tieneStockDisponible = computed(() => {
          (props.game.totalCorreos !== undefined && props.game.totalCorreos > 0)
 })
 
+// Determinar qué tipos de cuenta están disponibles según la versión del juego (siempre, para mantener layout)
+const allAccountTypesByVersion = computed<AccountType[]>(() => {
+  const types: AccountType[] = []
+  if (props.game.version === 'PS4' || props.game.version === 'PS4 & PS5') {
+    types.push('Principal PS4', 'Secundaria PS4')
+  }
+  if (props.game.version === 'PS5' || props.game.version === 'PS4 & PS5') {
+    types.push('Principal PS5', 'Secundaria PS5')
+  }
+  return types.length > 0 ? types : ['Principal PS4', 'Secundaria PS4', 'Principal PS5', 'Secundaria PS5']
+})
+
 // Determinar qué tipos de cuenta están disponibles según la versión del juego
 // Solo mostrar si hay stock disponible y tiene slots > 0 para ese tipo específico
 const availableAccountTypes = computed<AccountType[]>(() => {
@@ -56,14 +68,7 @@ const availableAccountTypes = computed<AccountType[]>(() => {
   const stockByType = props.game.stockByAccountType
   if (!stockByType) {
     // Fallback: si no hay información de slots por tipo, mostrar todos según versión
-    const types: AccountType[] = []
-    if (props.game.version === 'PS4' || props.game.version === 'PS4 & PS5') {
-      types.push('Principal PS4', 'Secundaria PS4')
-    }
-    if (props.game.version === 'PS5' || props.game.version === 'PS4 & PS5') {
-      types.push('Principal PS5', 'Secundaria PS5')
-    }
-    return types.length > 0 ? types : ['Principal PS4', 'Secundaria PS4', 'Principal PS5', 'Secundaria PS5']
+    return allAccountTypesByVersion.value
   }
   
   // Filtrar solo los tipos de cuenta que tienen slots disponibles (> 0)
@@ -222,20 +227,23 @@ const getVersionDescription = (type: AccountType): string => {
         </div>
       </div>
 
-      <!-- Selector de tipo de cuenta - Una columna (solo si hay stock disponible) -->
-      <div v-if="showAddToCart && tieneStockDisponible && availableAccountTypes.length > 1" class="space-y-1">
+      <!-- Selector de tipo de cuenta - Una columna (siempre presente, deshabilitado si no hay stock) -->
+      <div v-if="showAddToCart && allAccountTypesByVersion.length > 0" class="space-y-1">
         <div class="flex flex-col gap-1">
           <button
-            v-for="type in availableAccountTypes"
+            v-for="type in allAccountTypesByVersion"
             :key="type"
             @click="selectedAccountType = type"
+            :disabled="!tieneStockDisponible || availableAccountTypes.length === 0 || !availableAccountTypes.includes(type)"
             :class="[
               'w-full px-3 py-2 rounded-md text-sm font-bold transition-all duration-200 border text-left',
-              selectedAccountType === type 
-                ? 'bg-primary text-white border-primary shadow-md scale-[1.02]' 
-                : 'bg-base-200 text-base-content/60 border-base-300 hover:bg-base-300 hover:border-primary/30'
+              !tieneStockDisponible || availableAccountTypes.length === 0 || !availableAccountTypes.includes(type)
+                ? 'bg-base-300 text-base-content/40 border-base-300 cursor-not-allowed opacity-60'
+                : selectedAccountType === type 
+                  ? 'bg-primary text-white border-primary shadow-md scale-[1.02]' 
+                  : 'bg-base-200 text-base-content/60 border-base-300 hover:bg-base-300 hover:border-primary/30'
             ]"
-            :title="getVersionDescription(type)"
+            :title="!tieneStockDisponible || availableAccountTypes.length === 0 || !availableAccountTypes.includes(type) ? `${getVersionDescription(type)} - Sin disponibilidad` : getVersionDescription(type)"
           >
             {{ getVersionLabel(type) }}
           </button>
