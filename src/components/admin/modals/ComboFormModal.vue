@@ -221,7 +221,8 @@ const transformDriveUrl = (url: string): string => {
   if (!fileIdMatch || !fileIdMatch[1]) return url
   
   const fileId = fileIdMatch[1]
-  return `https://drive.google.com/thumbnail?id=${fileId}`
+  // URL en alta calidad (tamaño original)
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=s0`
 }
 
 const isDriveUrlTransformed = ref(false)
@@ -785,7 +786,7 @@ onMounted(async () => {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {{ isDriveUrlTransformed ? 'Las URLs de Google Drive se transforman automáticamente a formato thumbnail' : 'Pega la URL de la imagen. Si es de Google Drive, se convertirá automáticamente.' }}
+                {{ isDriveUrlTransformed ? 'Las URLs de Google Drive se transforman automáticamente a formato thumbnail en alta calidad (tamaño original)' : 'Pega la URL de la imagen. Si es de Google Drive, se convertirá automáticamente a alta calidad.' }}
               </span>
             </label>
           </div>
