@@ -110,101 +110,104 @@ export function useGames() {
       const plataformaRef = collection(db, 'games', plataforma, 'juegos')
       const querySnapshot = await getDocs(plataformaRef)
 
-      const juegosMap = new Map<string, GameSummary>()
-
-      // Iterar sobre cada documento de juego (ej: a_way_out)
-      for (const juegoDoc of querySnapshot.docs) {
+      // Procesar todos los juegos en paralelo (en vez de secuencialmente)
+      // para evitar N round-trips consecutivos a Firestore
+      const entries = await Promise.all(querySnapshot.docs.map(async (juegoDoc): Promise<[string, GameSummary]> => {
         const juegoId = juegoDoc.id
         const juegoDocData = juegoDoc.data()
-        
+
         // Intentar obtener todos los correos dentro de este juego
         // (esto puede fallar si el usuario no está autenticado)
-      let correos: string[] = []
-      let juegoData: any = null
-      let stockCount = 0
-      // Contar slots disponibles por tipo de cuenta
-      const stockByAccountType: Record<AccountType, number> = {
-        'Principal PS4': 0,
-        'Secundaria PS4': 0,
-        'Principal PS5': 0,
-        'Secundaria PS5': 0
-      }
+        let correos: string[] = []
+        let juegoData: any = null
+        let stockCount = 0
+        // Contar slots disponibles por tipo de cuenta
+        const stockByAccountType: Record<AccountType, number> = {
+          'Principal PS4': 0,
+          'Secundaria PS4': 0,
+          'Principal PS5': 0,
+          'Secundaria PS5': 0
+        }
 
-      try {
-        const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
-        const correosSnapshot = await getDocs(correosRef)
+        try {
+          const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
+          const correosSnapshot = await getDocs(correosRef)
 
-        correosSnapshot.docs.forEach((correoDoc) => {
-          const data = correoDoc.data()
-          correos.push(correoDoc.id)
-          if (!juegoData) {
-            juegoData = data
-          }
-          if (Array.isArray(data.cuentas)) {
-            data.cuentas.forEach((cuenta: AccountOwner) => {
-              if (cuenta?.hasStock && cuenta?.tipo) {
-                stockCount++
-                // Contar por tipo de cuenta
-                if (stockByAccountType[cuenta.tipo] !== undefined) {
-                  stockByAccountType[cuenta.tipo]++
+          correosSnapshot.docs.forEach((correoDoc) => {
+            const data = correoDoc.data()
+            correos.push(correoDoc.id)
+            if (!juegoData) {
+              juegoData = data
+            }
+            if (Array.isArray(data.cuentas)) {
+              data.cuentas.forEach((cuenta: AccountOwner) => {
+                if (cuenta?.hasStock && cuenta?.tipo) {
+                  stockCount++
+                  // Contar por tipo de cuenta
+                  if (stockByAccountType[cuenta.tipo] !== undefined) {
+                    stockByAccountType[cuenta.tipo]++
+                  }
                 }
-              }
-            })
-          }
-        })
-      } catch (error) {
-        // Si no tiene permisos (usuario no autenticado), usar datos del documento padre
-        console.log(`No se pudo acceder a correos de ${juegoId} (usuario no autenticado)`)
-        correos = []
-        stockCount = 0
-      }
+              })
+            }
+          })
+        } catch (error) {
+          // Si no tiene permisos (usuario no autenticado), usar datos del documento padre
+          console.log(`No se pudo acceder a correos de ${juegoId} (usuario no autenticado)`)
+          correos = []
+          stockCount = 0
+        }
 
-      // Convertir ID del juego a nombre legible (ej: a_way_out -> A Way Out)
-      const nombreFromId = juegoId
-        .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ')
+        // Convertir ID del juego a nombre legible (ej: a_way_out -> A Way Out)
+        const nombreFromId = juegoId
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ')
 
-      // Determinar tipo de promoción (migrar de isOffert si existe)
-      let tipoPromocion: 'ninguna' | 'oferta' | 'promocion' = 'ninguna'
-      if (juegoDocData.tipoPromocion) {
-        tipoPromocion = juegoDocData.tipoPromocion
-      } else if (juegoDocData.isOffert === true) {
-        tipoPromocion = 'oferta' // Migración automática
-      }
+        // Determinar tipo de promoción (migrar de isOffert si existe)
+        let tipoPromocion: 'ninguna' | 'oferta' | 'promocion' = 'ninguna'
+        if (juegoDocData.tipoPromocion) {
+          tipoPromocion = juegoDocData.tipoPromocion
+        } else if (juegoDocData.isOffert === true) {
+          tipoPromocion = 'oferta' // Migración automática
+        }
 
-      // Usar los precios del documento principal si existen, sino del primer correo, sino valores por defecto
-      const preciosJuego = juegoDocData.precios || juegoData?.precios || {
-        ps4Principal: juegoDocData.costo || juegoData?.costo || 0,
-        ps4Secundaria: juegoDocData.costo || juegoData?.costo || 0,
-        ps5Principal: juegoDocData.costo || juegoData?.costo || 0,
-        ps5Secundaria: juegoDocData.costo || juegoData?.costo || 0
-      }
-      
-      // Legacy: mantener costo para compatibilidad
-      const costoJuego = juegoDocData.costo !== undefined ? juegoDocData.costo : (juegoData?.costo || 0)
-      
-      // Usar la version del documento principal si existe, sino usar la plataforma actual o del primer correo
-      const versionJuego = juegoDocData.version || juegoData?.version || plataforma
+        // Usar los precios del documento principal si existen, sino del primer correo, sino valores por defecto
+        const preciosJuego = juegoDocData.precios || juegoData?.precios || {
+          ps4Principal: juegoDocData.costo || juegoData?.costo || 0,
+          ps4Secundaria: juegoDocData.costo || juegoData?.costo || 0,
+          ps5Principal: juegoDocData.costo || juegoData?.costo || 0,
+          ps5Secundaria: juegoDocData.costo || juegoData?.costo || 0
+        }
 
-      juegosMap.set(juegoId, {
-        id: juegoId,
-        nombre: juegoDocData.nombre || juegoData?.nombre || nombreFromId,
-        precios: preciosJuego, // Precios del documento principal (último correo subido)
-        costo: costoJuego, // Legacy: mantener para compatibilidad
-        version: versionJuego, // Categoría del juego (PS4, PS5, PS4 & PS5, etc.)
-        foto: juegoDocData.foto || '', // Foto del documento principal
-        activo: juegoDocData.activo !== false, // Por defecto true si no está definido
-        isOffert: juegoDocData.isOffert || false, // Legacy
-        tipoPromocion, // Nuevo campo de tipo de promoción
-        totalCorreos: correos.length,
-        correos,
-        stockAccounts: stockCount,
-        stockByAccountType // Slots disponibles por tipo de cuenta
-      })
-      }
+        // Legacy: mantener costo para compatibilidad
+        const costoJuego = juegoDocData.costo !== undefined ? juegoDocData.costo : (juegoData?.costo || 0)
 
-      const sortedGames = Array.from(juegosMap.values()).sort((a, b) => 
+        // Usar la version del documento principal si existe, sino usar la plataforma actual o del primer correo
+        const versionJuego = juegoDocData.version || juegoData?.version || plataforma
+
+        const juego: GameSummary = {
+          id: juegoId,
+          nombre: juegoDocData.nombre || juegoData?.nombre || nombreFromId,
+          precios: preciosJuego, // Precios del documento principal (último correo subido)
+          costo: costoJuego, // Legacy: mantener para compatibilidad
+          version: versionJuego, // Categoría del juego (PS4, PS5, PS4 & PS5, etc.)
+          foto: juegoDocData.foto || '', // Foto del documento principal
+          activo: juegoDocData.activo !== false, // Por defecto true si no está definido
+          isOffert: juegoDocData.isOffert || false, // Legacy
+          tipoPromocion, // Nuevo campo de tipo de promoción
+          totalCorreos: correos.length,
+          correos,
+          stockAccounts: stockCount,
+          stockByAccountType // Slots disponibles por tipo de cuenta
+        }
+
+        return [juegoId, juego]
+      }))
+
+      const juegosMap = new Map<string, GameSummary>(entries)
+
+      const sortedGames = Array.from(juegosMap.values()).sort((a, b) =>
         a.nombre.localeCompare(b.nombre)
       )
       

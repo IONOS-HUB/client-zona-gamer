@@ -114,10 +114,9 @@ export function useCombos() {
       const plataformaRef = collection(db, 'combos', plataforma, 'combos')
       const querySnapshot = await getDocs(plataformaRef)
 
-      const combosMap = new Map<string, ComboSummary>()
-
-      // Iterar sobre cada documento de combo (ej: assassins_creed_combo)
-      for (const comboDoc of querySnapshot.docs) {
+      // Procesar todos los combos en paralelo (en vez de secuencialmente)
+      // para evitar N round-trips consecutivos a Firestore
+      const entries = await Promise.all(querySnapshot.docs.map(async (comboDoc): Promise<[string, ComboSummary]> => {
         const comboId = comboDoc.id
         const comboDocData = comboDoc.data()
         
@@ -184,7 +183,7 @@ export function useCombos() {
         // Usar la version del documento principal si existe, sino usar la plataforma actual o del primer correo
         const versionCombo = comboDocData.version || comboData?.version || plataforma
 
-        combosMap.set(comboId, {
+        const combo: ComboSummary = {
           id: comboId,
           nombre: comboDocData.nombre || comboData?.nombre || nombreFromId,
           precio: precioCombo,
@@ -200,10 +199,14 @@ export function useCombos() {
           stockAccounts: stockCount,
           juegos: juegosCombo,
           juegoReferenciado: comboDocData.juegoReferenciado
-        })
-      }
+        }
 
-      const sortedCombos = Array.from(combosMap.values()).sort((a, b) => 
+        return [comboId, combo]
+      }))
+
+      const combosMap = new Map<string, ComboSummary>(entries)
+
+      const sortedCombos = Array.from(combosMap.values()).sort((a, b) =>
         a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
       )
 

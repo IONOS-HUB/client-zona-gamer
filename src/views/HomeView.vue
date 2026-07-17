@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- Loading mejorado -->
-    <div v-if="isLoadingGames || isLoadingCombos" class="flex justify-center items-center min-h-screen pt-28">
+    <div v-if="isLoadingGames" class="flex justify-center items-center min-h-screen pt-28">
       <div class="text-center space-y-6 animate-fadeInUp">
         <div class="relative">
           <span class="loading loading-spinner loading-lg text-error"></span>
