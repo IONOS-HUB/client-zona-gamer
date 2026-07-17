@@ -144,10 +144,14 @@ export function useCombos() {
             }
           })
         } catch (error) {
-          // Si no tiene permisos (usuario no autenticado), usar datos del documento padre
-          console.log(`No se pudo acceder a correos de ${comboId} (usuario no autenticado)`)
-          correos = []
-          stockCount = 0
+          // Sin permisos para leer /correos (visitante anónimo): usar los
+          // contadores de stock denormalizados guardados en el documento
+          // padre del combo (ver recalcularStockCombo / sincronizarCombos).
+          // Si el combo nunca fue sincronizado, estos campos serán
+          // undefined y se cae a 0 (comportamiento anterior).
+          console.log(`No se pudo acceder a correos de ${comboId} (usuario no autenticado), usando datos denormalizados`)
+          correos = Array.isArray(comboDocData.correos) ? comboDocData.correos : []
+          stockCount = typeof comboDocData.stockAccounts === 'number' ? comboDocData.stockAccounts : 0
         }
 
         // Convertir ID del combo a nombre legible
@@ -233,9 +237,28 @@ export function useCombos() {
   const sincronizarCombos = async (plataforma: ComboPlatform = 'PS4 & PS5'): Promise<void> => {
     isSyncingCombos.value = true
     try {
-      // Limpiar cache y forzar recarga
+      // Limpiar cache y forzar recarga (recalcula stockAccounts/correos en
+      // memoria a partir de lecturas en vivo de /correos, solo posible para
+      // un admin/empleado autenticado)
       clearCache(plataforma)
       await cargarCombos(plataforma, true)
+
+      // Backfill: persistir los contadores recién calculados en el
+      // documento padre de cada combo, para que los usuarios anónimos (que
+      // no pueden leer /correos) vean el stock real vía los campos
+      // denormalizados
+      await Promise.all(combos.value.map(async (combo) => {
+        try {
+          const comboRef = doc(db, 'combos', plataforma, 'combos', combo.id)
+          await setDoc(comboRef, {
+            totalCorreos: combo.totalCorreos,
+            correos: combo.correos,
+            stockAccounts: combo.stockAccounts ?? 0
+          }, { merge: true })
+        } catch (error) {
+          console.error(`Error persistiendo stock denormalizado de ${combo.id}:`, error)
+        }
+      }))
     } catch (error) {
       console.error('Error sincronizando combos:', error)
       throw error
@@ -360,6 +383,48 @@ export function useCombos() {
     return obj
   }
 
+  // Recalcula y persiste en el documento padre del combo los contadores de
+  // stock denormalizados (stockAccounts, totalCorreos, correos), leyendo la
+  // subcolección correos en vivo. Se ejecuta después de crear/actualizar/
+  // eliminar un correo para que el público (que no puede leer /correos)
+  // siga viendo el stock real vía ComboCard.
+  // Nunca debe bloquear la operación principal: los errores se registran y
+  // se ignoran silenciosamente.
+  const recalcularStockCombo = async (
+    plataforma: ComboPlatform,
+    comboId: string
+  ): Promise<void> => {
+    try {
+      const correosRef = collection(db, 'combos', plataforma, 'combos', comboId, 'correos')
+      const correosSnapshot = await getDocs(correosRef)
+
+      const correos: string[] = []
+      let stockAccounts = 0
+
+      correosSnapshot.docs.forEach((correoDoc) => {
+        const data = correoDoc.data()
+        correos.push(correoDoc.id)
+        if (Array.isArray(data.cuentas)) {
+          data.cuentas.forEach((cuenta: import('@/types/game').AccountOwner) => {
+            if (cuenta?.hasStock) {
+              stockAccounts++
+            }
+          })
+        }
+      })
+
+      const comboRef = doc(db, 'combos', plataforma, 'combos', comboId)
+      await setDoc(comboRef, {
+        totalCorreos: correos.length,
+        correos,
+        stockAccounts
+      }, { merge: true })
+    } catch (error) {
+      // No bloquear la operación principal si falla el recálculo de stock
+      console.error(`Error recalculando stock de ${comboId}:`, error)
+    }
+  }
+
   const crearCorreoCombo = async (
     plataforma: ComboPlatform,
     comboId: string,
@@ -436,6 +501,9 @@ export function useCombos() {
       }
       
       await setDoc(comboRef, updateData, { merge: true })
+
+      // Recalcular el stock denormalizado del combo (visible para público)
+      await recalcularStockCombo(plataforma, comboId)
     } catch (error) {
       console.error('Error creando correo:', error)
       throw error
@@ -522,6 +590,9 @@ export function useCombos() {
           ultimaActualizacionPrecio: Timestamp.now()
         }, { merge: true })
       }
+
+      // Recalcular el stock denormalizado del combo (visible para público)
+      await recalcularStockCombo(plataforma, comboId)
     } catch (error) {
       console.error('Error actualizando correo:', error)
       throw error
@@ -539,6 +610,9 @@ export function useCombos() {
       
       const correoRef = doc(db, 'combos', plataforma, 'combos', comboId, 'correos', correo)
       await deleteDoc(correoRef)
+
+      // Recalcular el stock denormalizado del combo (visible para público)
+      await recalcularStockCombo(plataforma, comboId)
     } catch (error) {
       console.error('Error eliminando correo:', error)
       throw error

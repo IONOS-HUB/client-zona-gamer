@@ -31,6 +31,14 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
+
+    // Verificar si la actualización SOLO toca los campos de stock denormalizado
+    // (usado para permitir que empleados recalculen el stock público de un
+    // juego/combo sin poder tocar precio, foto, activo, etc.)
+    function isStockOnlyUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['stockAccounts', 'stockByAccountType', 'totalCorreos', 'correos']);
+    }
     
     // Validar estructura de datos de usuario
     function isValidUserData() {
@@ -81,10 +89,13 @@ service cloud.firestore {
       
       // 🔒 CREAR: solo admins pueden crear juegos
       allow create: if isAdmin();
-      
-      // 🔒 ACTUALIZAR: solo admins pueden actualizar juegos
-      allow update: if isAdmin();
-      
+
+      // 🔒 ACTUALIZAR: admins pueden actualizar cualquier campo del juego.
+      // Empleados solo pueden actualizar los campos de stock denormalizado
+      // (stockAccounts, stockByAccountType, totalCorreos, correos), necesario
+      // para recalcular el stock público tras crear/editar/eliminar un correo
+      allow update: if isAdmin() || (isEmployeeOrAdmin() && isStockOnlyUpdate());
+
       // 🔒 ELIMINAR: solo admins pueden eliminar juegos
       allow delete: if isAdmin();
       
@@ -121,10 +132,13 @@ service cloud.firestore {
       
       // 🔒 CREAR: solo admins pueden crear combos
       allow create: if isAdmin();
-      
-      // 🔒 ACTUALIZAR: solo admins pueden actualizar combos
-      allow update: if isAdmin();
-      
+
+      // 🔒 ACTUALIZAR: admins pueden actualizar cualquier campo del combo.
+      // Empleados solo pueden actualizar los campos de stock denormalizado
+      // (stockAccounts, stockByAccountType, totalCorreos, correos), necesario
+      // para recalcular el stock público tras crear/editar/eliminar un correo
+      allow update: if isAdmin() || (isEmployeeOrAdmin() && isStockOnlyUpdate());
+
       // 🔒 ELIMINAR: solo admins pueden eliminar combos
       allow delete: if isAdmin();
       

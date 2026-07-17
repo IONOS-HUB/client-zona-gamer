@@ -73,6 +73,12 @@ export interface ComboDocument {
   precios?: GamePrices
   costo?: number
   juegoReferenciado?: string // ID del juego referenciado (opcional)
+  // Contadores de stock denormalizados desde la subcolección correos
+  // (necesarios porque los visitantes anónimos no tienen permiso de
+  // lectura sobre /correos)
+  totalCorreos?: number
+  correos?: string[]
+  stockAccounts?: number
 }
 
 export interface ComboFilters {

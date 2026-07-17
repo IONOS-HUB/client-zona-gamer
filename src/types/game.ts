@@ -81,6 +81,14 @@ export interface GameDocument {
   ultimaActualizacionPrecio?: Date // Fecha del último correo que actualizó el precio
   // Legacy: mantener costo para compatibilidad durante migración
   costo?: number
+  // Contadores de stock denormalizados desde la subcolección correos
+  // (necesarios porque los visitantes anónimos no tienen permiso de
+  // lectura sobre /correos). Se recalculan tras cada mutación de un correo
+  // y en el backfill del botón "Sincronizar"
+  totalCorreos?: number
+  correos?: string[]
+  stockAccounts?: number
+  stockByAccountType?: Record<AccountType, number>
 }
 
 export interface GameFilters {

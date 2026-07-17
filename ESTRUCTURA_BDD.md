@@ -157,6 +157,15 @@ Documento de plataforma (ej: "PS4 & PS5", "PS4", "PS5", "Xbox", "Nintendo Switch
 - Para juegos: Documento contenedor del juego (ej: "a_way_out")
 - Para combos: Documento contenedor del combo (ej: "assassins_creed_combo")
 Este documento puede estar vacío o contener metadata general.
+- Además de nombre/precios/foto/activo, este documento guarda una copia
+  denormalizada de los contadores de stock (`totalCorreos`, `correos`,
+  `stockAccounts`, `stockByAccountType` en juegos) calculada a partir de
+  la subcolección `correos/`. Esto es necesario porque los visitantes
+  anónimos no tienen permiso de lectura sobre `correos/` (contiene datos
+  sensibles), así que la tarjeta pública lee el stock desde aquí en vez
+  de la subcolección en vivo. Se recalcula automáticamente al crear/editar/
+  eliminar un correo, y con el botón "Sincronizar" del panel de admin/
+  empleado para los documentos que ya existían.
 
 ### Nivel 5: `correos/` (Subcolección)
 **IMPORTANTE**: Aquí es donde está toda la información real. Cada correo es un documento que contiene:

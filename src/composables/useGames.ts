@@ -152,10 +152,21 @@ export function useGames() {
             }
           })
         } catch (error) {
-          // Si no tiene permisos (usuario no autenticado), usar datos del documento padre
-          console.log(`No se pudo acceder a correos de ${juegoId} (usuario no autenticado)`)
-          correos = []
-          stockCount = 0
+          // Sin permisos para leer /correos (visitante anónimo): usar los
+          // contadores de stock denormalizados guardados en el documento
+          // padre del juego (ver recalcularStockJuego / sincronizarJuegos).
+          // Si el juego nunca fue sincronizado, estos campos serán
+          // undefined y se cae a 0 (comportamiento anterior).
+          console.log(`No se pudo acceder a correos de ${juegoId} (usuario no autenticado), usando datos denormalizados`)
+          correos = Array.isArray(juegoDocData.correos) ? juegoDocData.correos : []
+          stockCount = typeof juegoDocData.stockAccounts === 'number' ? juegoDocData.stockAccounts : 0
+          if (juegoDocData.stockByAccountType) {
+            (Object.keys(stockByAccountType) as AccountType[]).forEach((tipo) => {
+              if (typeof juegoDocData.stockByAccountType[tipo] === 'number') {
+                stockByAccountType[tipo] = juegoDocData.stockByAccountType[tipo]
+              }
+            })
+          }
         }
 
         // Convertir ID del juego a nombre legible (ej: a_way_out -> A Way Out)
@@ -226,9 +237,29 @@ export function useGames() {
   const sincronizarJuegos = async (plataforma: GamePlatform = 'PS4 & PS5'): Promise<void> => {
     isSyncingGames.value = true
     try {
-      // Limpiar cache y forzar recarga
+      // Limpiar cache y forzar recarga (recalcula stockAccounts/correos en
+      // memoria a partir de lecturas en vivo de /correos, solo posible para
+      // un admin/empleado autenticado)
       clearCache(plataforma)
       await cargarJuegos(plataforma, true)
+
+      // Backfill: persistir los contadores recién calculados en el
+      // documento padre de cada juego, para que los usuarios anónimos (que
+      // no pueden leer /correos) vean el stock real vía los campos
+      // denormalizados
+      await Promise.all(games.value.map(async (juego) => {
+        try {
+          const juegoRef = doc(db, 'games', plataforma, 'juegos', juego.id)
+          await setDoc(juegoRef, {
+            totalCorreos: juego.totalCorreos,
+            correos: juego.correos,
+            stockAccounts: juego.stockAccounts ?? 0,
+            stockByAccountType: juego.stockByAccountType
+          }, { merge: true })
+        } catch (error) {
+          console.error(`Error persistiendo stock denormalizado de ${juego.id}:`, error)
+        }
+      }))
     } catch (error) {
       console.error('Error sincronizando juegos:', error)
       throw error
@@ -346,6 +377,58 @@ export function useGames() {
     return obj
   }
 
+  // Recalcula y persiste en el documento padre del juego los contadores de
+  // stock denormalizados (stockAccounts, stockByAccountType, totalCorreos,
+  // correos), leyendo la subcolección correos en vivo. Se ejecuta después de
+  // crear/actualizar/eliminar un correo para que el público (que no puede
+  // leer /correos) siga viendo el stock real vía GameCard.
+  // Nunca debe bloquear la operación principal: los errores se registran y
+  // se ignoran silenciosamente.
+  const recalcularStockJuego = async (
+    plataforma: GamePlatform,
+    juegoId: string
+  ): Promise<void> => {
+    try {
+      const correosRef = collection(db, 'games', plataforma, 'juegos', juegoId, 'correos')
+      const correosSnapshot = await getDocs(correosRef)
+
+      const correos: string[] = []
+      let stockAccounts = 0
+      const stockByAccountType: Record<AccountType, number> = {
+        'Principal PS4': 0,
+        'Secundaria PS4': 0,
+        'Principal PS5': 0,
+        'Secundaria PS5': 0
+      }
+
+      correosSnapshot.docs.forEach((correoDoc) => {
+        const data = correoDoc.data()
+        correos.push(correoDoc.id)
+        if (Array.isArray(data.cuentas)) {
+          data.cuentas.forEach((cuenta: AccountOwner) => {
+            if (cuenta?.hasStock && cuenta?.tipo) {
+              stockAccounts++
+              if (stockByAccountType[cuenta.tipo] !== undefined) {
+                stockByAccountType[cuenta.tipo]++
+              }
+            }
+          })
+        }
+      })
+
+      const juegoRef = doc(db, 'games', plataforma, 'juegos', juegoId)
+      await setDoc(juegoRef, {
+        totalCorreos: correos.length,
+        correos,
+        stockAccounts,
+        stockByAccountType
+      }, { merge: true })
+    } catch (error) {
+      // No bloquear la operación principal si falla el recálculo de stock
+      console.error(`Error recalculando stock de ${juegoId}:`, error)
+    }
+  }
+
   const crearCorreoJuego = async (
     plataforma: GamePlatform,
     juegoId: string,
@@ -429,6 +512,9 @@ export function useGames() {
       }
       
       await setDoc(juegoRef, updateData, { merge: true })
+
+      // Recalcular el stock denormalizado del juego (visible para público)
+      await recalcularStockJuego(plataforma, juegoId)
     } catch (error) {
       console.error('Error creando correo:', error)
       throw error
@@ -510,6 +596,9 @@ export function useGames() {
           ultimaActualizacionPrecio: Timestamp.now()
         }, { merge: true })
       }
+
+      // Recalcular el stock denormalizado del juego (visible para público)
+      await recalcularStockJuego(plataforma, juegoId)
     } catch (error) {
       console.error('Error actualizando correo:', error)
       throw error
@@ -527,6 +616,9 @@ export function useGames() {
       
       const correoRef = doc(db, 'games', plataforma, 'juegos', juegoId, 'correos', correo)
       await deleteDoc(correoRef)
+
+      // Recalcular el stock denormalizado del juego (visible para público)
+      await recalcularStockJuego(plataforma, juegoId)
     } catch (error) {
       console.error('Error eliminando correo:', error)
       throw error
