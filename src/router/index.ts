@@ -29,7 +29,7 @@ const router = createRouter({
       },
     },
     {
-      path: '/ver-mas',
+      path: '/ver-mas/:filtros?',
       name: 'VerMas',
       component: VerMasView,
       meta: { 

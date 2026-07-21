@@ -19,7 +19,7 @@ const { selectedCurrency, currentCountry, currencySymbol, changeCurrency, format
 
 // Computed para determinar la ruta activa
 const isHomeActive = computed(() => route.path === '/')
-const isCatalogActive = computed(() => route.path === '/ver-mas')
+const isCatalogActive = computed(() => route.path.startsWith('/ver-mas'))
 
 const searchQuery = ref('')
 const selectedPlatform = ref<GamePlatform>('PS4 & PS5')

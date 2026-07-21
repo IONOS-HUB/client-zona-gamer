@@ -67,34 +67,99 @@ const itemsPerPage = 12
 // Tipos de contenido
 type ContentItem = (GameSummary | ComboSummary) & { tipo: 'juego' | 'combo' }
 
-// Cargar tipo desde query params
+// --- Filtros combinables en la URL (/ver-mas/ps4+ofertas) ---
+const PLATAFORMA_SLUGS: Record<string, GamePlatform> = { ps4: 'PS4', ps5: 'PS5' }
+const PLATAFORMA_SLUGS_REVERSE: Partial<Record<GamePlatform, string>> = { PS4: 'ps4', PS5: 'ps5' }
+const TIPO_SLUGS = ['juegos', 'combos', 'ofertas', 'promociones']
+const ORDEN_SLUGS = ['precio-asc', 'precio-desc', 'nombre-asc', 'nombre-desc']
+
+const parseFiltrosSlug = (slug: string | undefined): { tipo?: string; plataforma?: GamePlatform; orden?: string } => {
+  if (!slug) return {}
+  const resultado: { tipo?: string; plataforma?: GamePlatform; orden?: string } = {}
+  slug.split('+').forEach(token => {
+    if (token in PLATAFORMA_SLUGS) {
+      resultado.plataforma = PLATAFORMA_SLUGS[token]
+    } else if (TIPO_SLUGS.includes(token)) {
+      resultado.tipo = token
+    } else if (ORDEN_SLUGS.includes(token)) {
+      resultado.orden = token
+    }
+  })
+  return resultado
+}
+
+const buildFiltrosSlug = (tipo: string, plataforma: GamePlatform, orden: string): string => {
+  const partes: string[] = []
+  const plataformaSlug = PLATAFORMA_SLUGS_REVERSE[plataforma]
+  if (plataformaSlug) partes.push(plataformaSlug)
+  if (tipo !== 'todos') partes.push(tipo)
+  if (orden !== 'relevancia') partes.push(orden)
+  return partes.join('+')
+}
+
+// Simple debounce para no reescribir la URL en cada tecla/tick del slider
+const debounce = <T extends (...args: unknown[]) => void>(fn: T, delayMs: number): T => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  return ((...args: Parameters<T>) => {
+    if (timeoutId) clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn(...args), delayMs)
+  }) as T
+}
+
+// URL → filtros (carga inicial, back/forward del navegador, links compartidos)
+const applyFiltersFromRoute = (): void => {
+  const slug = route.params.filtros as string | undefined
+  const parsed = parseFiltrosSlug(slug)
+
+  selectedTipo.value = parsed.tipo ?? (route.query.tipo as string) ?? 'todos'
+  selectedPlataforma.value = parsed.plataforma ?? (route.query.plataforma as GamePlatform) ?? 'PS4 & PS5'
+  selectedOrden.value = parsed.orden ?? (route.query.orden as string) ?? 'relevancia'
+  searchQuery.value = (route.query.q as string) ?? ''
+
+  const min = route.query.min ? Number(route.query.min) : undefined
+  const max = route.query.max ? Number(route.query.max) : undefined
+  precioMin.value = min ?? rangoPrecios.value.min
+  precioMax.value = max ?? rangoPrecios.value.defaultMax
+}
+
+// Filtros → URL (normaliza a la forma compartible con slug + query)
+const syncRouteFromFilters = (): void => {
+  const slug = buildFiltrosSlug(selectedTipo.value, selectedPlataforma.value, selectedOrden.value)
+  const query: Record<string, string> = {}
+  if (searchQuery.value) query.q = searchQuery.value
+  if (precioMin.value > rangoPrecios.value.min) query.min = String(precioMin.value)
+  if (precioMax.value < rangoPrecios.value.defaultMax) query.max = String(precioMax.value)
+
+  const filtrosActuales = (route.params.filtros as string | undefined) ?? ''
+  const queryActual = route.query
+  const mismoSlug = filtrosActuales === slug
+  const mismoQuery = (queryActual.q ?? '') === (query.q ?? '') &&
+    (queryActual.min ?? '') === (query.min ?? '') &&
+    (queryActual.max ?? '') === (query.max ?? '')
+
+  if (mismoSlug && mismoQuery) return
+
+  router.replace({
+    name: 'VerMas',
+    params: { filtros: slug || undefined },
+    query
+  }).catch(() => {})
+}
+
+// Parseo inicial (antes de registrar los watchers de filtros→URL, para no
+// disparar una navegación redundante en el primer render)
+applyFiltersFromRoute()
+
+watch([selectedTipo, selectedPlataforma, selectedOrden], syncRouteFromFilters)
+watch([searchQuery, precioMin, precioMax], debounce(syncRouteFromFilters, 400))
+// Back/forward del navegador y navegaciones externas a esta misma ruta
+watch(() => route.fullPath, applyFiltersFromRoute)
+
+// Normaliza la URL inicial a la forma con slug (ej. links legacy con
+// ?tipo=juegos pasan a /ver-mas/juegos); no-op si ya está en esa forma
+syncRouteFromFilters()
+
 onMounted(async () => {
-  const tipo = route.query.tipo as string
-  const categoria = route.query.categoria as string
-  const plataforma = route.query.plataforma as string
-  const orden = route.query.orden as string
-  const busqueda = route.query.q as string
-  
-  if (tipo) {
-    selectedTipo.value = tipo
-  }
-  
-  if (plataforma) {
-    selectedPlataforma.value = plataforma as GamePlatform
-  }
-  
-  if (orden) {
-    selectedOrden.value = orden
-  }
-  
-  if (busqueda) {
-    searchQuery.value = busqueda
-  }
-  
-  if (categoria) {
-    // Puedes usar la categoría para mostrar un título específico
-  }
-  
   // Cargar datos
   await Promise.all([
     cargarJuegos('PS4 & PS5'),
