@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import type { GameSummary, AccountType } from '@/types/game'
+import { useCurrency } from '@/composables/useCurrency'
 
 export interface CartItem extends GameSummary {
   quantity: number
@@ -49,36 +50,25 @@ const saveCartToStorage = (cartItems: CartItem[]): void => {
 export const useCartStore = defineStore('cart', () => {
   // Cargar carrito desde localStorage al inicializar
   const items = ref<CartItem[]>(loadCartFromStorage())
+  const { getPrice } = useCurrency()
 
   // Computed
   const totalItems = computed(() => {
     return items.value.reduce((total, item) => total + item.quantity, 0)
   })
 
+  const getItemPrice = (item: CartItem): number => {
+    const precioBase = getPrice(item.precios, item.selectedAccountType)
+
+    if (item.descuento && item.descuento > 0) {
+      return precioBase * (1 - item.descuento / 100)
+    }
+    return precioBase
+  }
+
   const totalPrice = computed(() => {
     return items.value.reduce((total, item) => {
-      // Obtener el precio según el tipo de cuenta seleccionado
-      let precioBase = 0
-      switch (item.selectedAccountType) {
-        case 'Principal PS4':
-          precioBase = item.precios.ps4Principal
-          break
-        case 'Secundaria PS4':
-          precioBase = item.precios.ps4Secundaria
-          break
-        case 'Principal PS5':
-          precioBase = item.precios.ps5Principal
-          break
-        case 'Secundaria PS5':
-          precioBase = item.precios.ps5Secundaria
-          break
-      }
-      
-      // Calcular precio con descuento si aplica
-      const precioUnitario = item.descuento && item.descuento > 0
-        ? precioBase * (1 - item.descuento / 100)
-        : precioBase
-      return total + (precioUnitario * item.quantity)
+      return total + (getItemPrice(item) * item.quantity)
     }, 0)
   })
 
@@ -153,29 +143,6 @@ export const useCartStore = defineStore('cart', () => {
     return item?.quantity || 0
   }
   
-  const getItemPrice = (item: CartItem): number => {
-    let precioBase = 0
-    switch (item.selectedAccountType) {
-      case 'Principal PS4':
-        precioBase = item.precios.ps4Principal
-        break
-      case 'Secundaria PS4':
-        precioBase = item.precios.ps4Secundaria
-        break
-      case 'Principal PS5':
-        precioBase = item.precios.ps5Principal
-        break
-      case 'Secundaria PS5':
-        precioBase = item.precios.ps5Secundaria
-        break
-    }
-    
-    if (item.descuento && item.descuento > 0) {
-      return precioBase * (1 - item.descuento / 100)
-    }
-    return precioBase
-  }
-
   return {
     items,
     totalItems,

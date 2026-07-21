@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, onBeforeUnmount, defineAsyncComponent 
 import { useGames } from '@/composables/useGames'
 import { useCombos } from '@/composables/useCombos'
 import { useCartStore } from '@/stores/cart'
+import { useCurrency } from '@/composables/useCurrency'
 import { generarStructuredData, eliminarStructuredData } from '@/composables/useSEO'
 import type { GamePlatform } from '@/types/game'
 
@@ -30,6 +31,7 @@ const AppFooter = defineAsyncComponent(() => import('@/components/ui/AppFooter.v
 const { games, isLoadingGames, cargarJuegos } = useGames()
 const { combos, isLoadingCombos, cargarCombos } = useCombos()
 const cartStore = useCartStore()
+const { selectedCurrency, currentCountry, formatPrice } = useCurrency()
 
 const plataformaSeleccionada = ref<GamePlatform>('PS4 & PS5')
 const filtroPlataforma = ref<GamePlatform>('PS4 & PS5') // Filtro visual en el navbar
@@ -136,30 +138,32 @@ const handleCloseCart = (): void => {
 
 const handleCheckout = (): void => {
   if (cartStore.isEmpty) return
-  
+
+  const moneda = selectedCurrency.value === 'USD' ? 'USD' : 'COP'
+
   // Generar mensaje para WhatsApp
-  let mensaje = '¡Hola! Me gustaría realizar el siguiente pedido:%0A%0A'
-  
+  let mensaje = `¡Hola! Me gustaría realizar el siguiente pedido (${currentCountry.value} - ${moneda}):%0A%0A`
+
   cartStore.items.forEach((item, index) => {
     const precioUnitario = cartStore.getItemPrice(item)
     mensaje += `${index + 1}. ${item.nombre}%0A`
     mensaje += `   Plataforma: ${item.version}%0A`
     mensaje += `   Tipo de cuenta: ${item.selectedAccountType}%0A`
     mensaje += `   Cantidad: ${item.quantity}%0A`
-    mensaje += `   Precio: $${precioUnitario.toFixed(2)} c/u%0A`
-    mensaje += `   Subtotal: $${(precioUnitario * item.quantity).toFixed(2)}%0A%0A`
+    mensaje += `   Precio: ${formatPrice(precioUnitario)} c/u%0A`
+    mensaje += `   Subtotal: ${formatPrice(precioUnitario * item.quantity)}%0A%0A`
   })
-  
-  mensaje += `*TOTAL: $${cartStore.totalPrice.toFixed(2)}*%0A%0A`
+
+  mensaje += `*TOTAL: ${formatPrice(cartStore.totalPrice)}*%0A%0A`
   mensaje += 'Espero su confirmación. ¡Gracias!'
-  
-  // Número de WhatsApp (formato internacional sin +)
-  const numeroWhatsApp = '593998480376'
-  
+
+  // Número de WhatsApp (formato internacional sin +) según país/moneda seleccionada
+  const numeroWhatsApp = selectedCurrency.value === 'COP' ? '573013456542' : '593998480376'
+
   // Abrir WhatsApp en nueva pestaña
   const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${mensaje}`
   window.open(urlWhatsApp, '_blank')
-  
+
   // Cerrar el modal del carrito
   handleCloseCart()
 }

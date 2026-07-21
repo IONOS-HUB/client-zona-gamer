@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useCartStore } from '@/stores/cart'
+import { useCurrency } from '@/composables/useCurrency'
 import { Send, Trash2 } from 'lucide-vue-next'
 
 interface Props {
@@ -15,18 +16,12 @@ const emit = defineEmits<{
 }>()
 
 const cartStore = useCartStore()
+const { formatPrice: formatearPrecio } = useCurrency()
 
 // Estados para confirmaciones
 const showDeleteConfirm = ref(false)
 const itemToDelete = ref<string | null>(null)
 const showClearCartConfirm = ref(false)
-
-const formatearPrecio = (precio: number): string => {
-  return new Intl.NumberFormat('es-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(precio)
-}
 
 const handleClose = (): void => {
   emit('close')
