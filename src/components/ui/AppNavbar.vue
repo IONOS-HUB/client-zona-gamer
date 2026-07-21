@@ -247,8 +247,8 @@ const handleQuickCheckout = (): void => {
   mensaje += `*TOTAL: ${formatPrice(cartStore.totalPrice)}*%0A%0A`
   mensaje += 'Espero su confirmación. ¡Gracias!'
   
-  // Número de WhatsApp (formato internacional sin +)
-  const numeroWhatsApp = '593998480376'
+  // Número de WhatsApp (formato internacional sin +) según país/moneda seleccionada
+  const numeroWhatsApp = selectedCurrency.value === 'COP' ? '573013456542' : '593998480376'
   
   // Abrir WhatsApp en nueva pestaña
   const urlWhatsApp = `https://wa.me/${numeroWhatsApp}?text=${mensaje}`
