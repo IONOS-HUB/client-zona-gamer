@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed, ref } from 'vue'
-import { MessageCircle, Gamepad2, Star } from 'lucide-vue-next'
+import { MessageCircle, Gamepad2, Star, ExternalLink } from 'lucide-vue-next'
 import { useCartStore } from '@/stores/cart'
 import type { GameSummary } from '@/types/game'
 
@@ -436,6 +436,13 @@ const handleExploreCatalog = () => {
   window.location.href = '/ver-mas'
 }
 
+const CATALOGO_DRIVE_URL =
+  'https://drive.google.com/drive/folders/15J9ddKECVPWHcO9Vh38HXLJ8z-GsCUWy'
+
+const handleOpenDriveCatalog = () => {
+  window.open(CATALOGO_DRIVE_URL, '_blank', 'noopener,noreferrer')
+}
+
 const handleAddToCart = (game: GameSummary | undefined) => {
   if (!game) return
   
@@ -586,6 +593,26 @@ onUnmounted(() => {
             >
               <Gamepad2 :size="18" class="sm:w-5 sm:h-5 md:w-6 md:h-6" />
               <span class="text-xs sm:text-sm md:text-base">Explorar Catálogo</span>
+            </button>
+          </div>
+
+          <!-- Catálogos Drive -->
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 max-w-lg mx-auto lg:mx-0">
+            <button
+              type="button"
+              @click="handleOpenDriveCatalog"
+              class="btn btn-sm sm:btn-md md:btn-lg gap-2 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 border-0 bg-orange-500 hover:bg-orange-600"
+            >
+              <ExternalLink :size="18" class="sm:w-5 sm:h-5 md:w-6 md:h-6" />
+              <span class="text-xs sm:text-sm md:text-base">Catálogo PS4 y PS5</span>
+            </button>
+            <button
+              type="button"
+              @click="handleOpenDriveCatalog"
+              class="btn btn-sm sm:btn-md md:btn-lg gap-2 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 border-0 bg-orange-500 hover:bg-orange-600"
+            >
+              <ExternalLink :size="18" class="sm:w-5 sm:h-5 md:w-6 md:h-6" />
+              <span class="text-xs sm:text-sm md:text-base">Combos PS4 y PS5</span>
             </button>
           </div>
         </div>
