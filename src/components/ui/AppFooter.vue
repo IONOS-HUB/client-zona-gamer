@@ -160,6 +160,17 @@ const scrollToSection = (sectionId: string): void => {
     <p class="text-xs text-base-content/60 mt-2">
       Hecho con ❤️ para los gamers ecuatorianos
     </p>
+    <p class="text-xs text-base-content/60 mt-2">
+      Diseño y desarrollo: 
+      <a 
+        href="https://ionoshub.net/" 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        class="font-semibold text-primary hover:text-error hover:underline transition-colors duration-300"
+      >
+        IONOS HUB
+      </a>
+    </p>
   </div>
 </template>
 
