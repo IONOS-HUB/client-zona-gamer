@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "vite",
@@ -27,9 +27,9 @@
     "vuefire": "^3.2.2"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.2",
+    "@tsconfig/node24": "^24.0.5",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^22.18.11",
+    "@types/node": "^24.19.2",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.8.1",
     "daisyui": "^5.4.7",
